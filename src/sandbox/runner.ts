@@ -19,7 +19,9 @@ const IDLE_TIMEOUT_MS = 5 * 60_000;
 
 // The proxy token reaches only the sidecar, as INFISICAL_AGENT_VAULT_PROXY_TOKEN from
 // a Modal Secret. Each start loads the proxy's settings and CA from Infisical.
-const PROXY_COMMAND = `mkdir -p /tmp/proxy && exec infisical agent-vault proxy --data-dir /tmp/proxy --port ${PROXY_PORT} --telemetry=false >/tmp/proxy.log 2>&1`;
+// `|| sleep 600` keeps a crashed sidecar around so its log can be read (Modal removes
+// a sidecar when its command exits), as in Infisical's Agent Vault Modal guide.
+const PROXY_COMMAND = `mkdir -p /tmp/proxy && { infisical agent-vault proxy --data-dir /tmp/proxy --port ${PROXY_PORT} --telemetry=false >/tmp/proxy.log 2>&1 || sleep 600; }`;
 
 const WAIT_FOR_PROXY = `node -e '
 const deadline = Date.now() + 30000;
@@ -168,7 +170,14 @@ export async function runInSandbox(
     model,
     draft,
     seed: [...ctx.sources.values()],
-    env: { ...sandboxEnv(), DATA_DIR: "/tmp/design-intern-data", CLAUDE_CODE_EXECUTABLE: CLAUDE_BINARY },
+    env: {
+      ...sandboxEnv(),
+      DATA_DIR: "/tmp/design-intern-data",
+      CLAUDE_CODE_EXECUTABLE: CLAUDE_BINARY,
+      // Telemetry and update checks would only hit hosts the proxy refuses.
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
+      DISABLE_AUTOUPDATER: "1",
+    },
   };
   const ttl = `${Math.ceil((cfg.timeoutMs + SESSION_MARGIN_MS) / 60_000)}m`;
   const bundleFile = appBundle();
