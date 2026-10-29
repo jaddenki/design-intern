@@ -90,6 +90,16 @@ test("slack: only what's said beyond the draft request becomes the check-in", as
   assert.equal(checkInFrom("can u draft this week's design update? btw i also worked on series B video"), "btw i also worked on series B video");
 });
 
+test("slack: brand asset links become image previews, SVGs via their PNG, other hosts never", async () => {
+  const { brandImages } = await import("./slack-images.js");
+  const base = "https://infisical-brand.vercel.app/assets/logos";
+  assert.deepEqual(
+    brandImages(`PNG: ${base}/full_logo_white.png and SVG: ${base}/full_logo_white.svg, also ${base}/logomark_black.svg`).map((i) => i.url),
+    [`${base}/full_logo_white.png`, `${base}/logomark_black.png`],
+  );
+  assert.deepEqual(brandImages("https://evil.example/x.png https://infisical-brand.vercel.app.evil.io/assets/a.png"), []);
+});
+
 test("figma: project files merge with single file keys, project metadata wins", () => {
   const files = mergeFiles(["a", "b"], [{ key: "b", name: "Onboarding", lastModified: "2026-10-22T00:00:00Z", project: "Design" }, { key: "c", name: "Icons", lastModified: null, project: "Design" }]);
   assert.deepEqual(files.map((f) => f.key).sort(), ["a", "b", "c"]);

@@ -7,6 +7,7 @@ import { finalMessage } from "./drafts/render.js";
 import { findDraftByPreview, getDraft } from "./drafts/store.js";
 import { checkInFrom, DRAFT_REQUEST } from "./slack-draft-request.js";
 import { splitForSlack } from "./slack-chunks.js";
+import { brandImages, imageBlocks } from "./slack-images.js";
 import { runAgent } from "./run-agent.js";
 import { startWeeklyFromEnv } from "./schedule.js";
 import { APPROVE_ACTION, EDIT_ACTION, EDIT_MAX_CHARS, EDIT_VIEW, REJECT_ACTION } from "./slack-approval.js";
@@ -108,6 +109,12 @@ async function handleMessage(
     const [first, ...rest] = splitForSlack(text);
     await client.chat.update({ channel, ts: thinkingTs, text: first });
     for (const part of rest) await client.chat.postMessage({ channel, thread_ts: threadTs, text: part });
+    const images = brandImages(text);
+    if (images.length > 0) {
+      await client.chat
+        .postMessage({ channel, thread_ts: threadTs, text: images.map((i) => i.name).join(", "), blocks: imageBlocks(images) })
+        .catch((err) => console.error("Couldn't post image preview:", err));
+    }
   };
 
   let lastProgress = "";
