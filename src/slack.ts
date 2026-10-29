@@ -14,6 +14,14 @@ import { startWebServer } from "./web/server.js";
 // @slack/web-api hard-codes `proxy: false` on its axios client, ignoring
 // HTTPS_PROXY env vars. Pass an explicit agent so the agent-vault MITM proxy
 // can intercept and substitute placeholder tokens.
+const missing = ["SLACK_BOT_TOKEN", "SLACK_APP_TOKEN"].filter((k) => !process.env[k]?.trim());
+if (missing.length > 0) {
+  console.error(
+    `Missing ${missing.join(" and ")} in Secrets Manager (dev, /host). The bot token (xoxb-) appears under OAuth & Permissions once the app is installed in the workspace; the app token (xapp-) under Basic Information > App-Level Tokens.`,
+  );
+  process.exit(1);
+}
+
 const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
   appToken: process.env.SLACK_APP_TOKEN,
