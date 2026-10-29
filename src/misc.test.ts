@@ -60,6 +60,29 @@ test("models: Haiku for reference and asset questions, Sonnet for draft talk, Op
   assert.equal(modelFor("chat", { question: "can you update the draft?" }), CHAT_MODEL);
 });
 
+test("slack: draft requests are spotted mid-sentence, questions about drafts aren't", async () => {
+  const { DRAFT_REQUEST } = await import("./slack-draft-request.js");
+  for (const m of ["draft this week's design update", "can u draft this week's design update? btw i also worked on series B", "please write the weekly recap"]) {
+    assert.ok(DRAFT_REQUEST.test(m), m);
+  }
+  for (const m of ["why is the banner in the update?", "what's our primary color?", "drop the icon line from the draft"]) {
+    assert.ok(!DRAFT_REQUEST.test(m), m);
+  }
+});
+
+test("slack: long replies split under the limit with code fences kept balanced", async () => {
+  const { splitForSlack } = await import("./slack-chunks.js");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg"><path d="${"M1 2L3 4".repeat(700)}"/></svg>`;
+  const parts = splitForSlack(`Here's the white full logo.\n\n\`\`\`svg\n${svg}\n\`\`\`\nUse it on black.`, 1_000);
+  assert.ok(parts.length > 1);
+  for (const p of parts) {
+    assert.ok(p.length <= 1_000, `part is ${p.length} chars`);
+    assert.equal((p.match(/```/g) ?? []).length % 2, 0, p.slice(0, 80));
+  }
+  assert.equal(parts.join("").replace(/```(svg)?\n?/g, "").replace(/\n/g, "").includes(svg.slice(0, 200)), true);
+  assert.deepEqual(splitForSlack("short"), ["short"]);
+});
+
 test("figma: project files merge with single file keys, project metadata wins", () => {
   const files = mergeFiles(["a", "b"], [{ key: "b", name: "Onboarding", lastModified: "2026-10-22T00:00:00Z", project: "Design" }, { key: "c", name: "Icons", lastModified: null, project: "Design" }]);
   assert.deepEqual(files.map((f) => f.key).sort(), ["a", "b", "c"]);

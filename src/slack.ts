@@ -3,8 +3,10 @@ import { App } from "@slack/bolt";
 import { allowlistConfigured, DESIGN_TEAM_ONLY_MESSAGE, isAllowedEmail } from "./access.js";
 import { AGENT_NAME } from "./config.js";
 import { approveDraft, generateDraft, rejectDraft } from "./drafts/actions.js";
-import { renderDraftMrkdwn } from "./drafts/render.js";
+import { finalMessage } from "./drafts/render.js";
 import { findDraftByPreview } from "./drafts/store.js";
+import { DRAFT_REQUEST } from "./slack-draft-request.js";
+import { splitForSlack } from "./slack-chunks.js";
 import { runAgent } from "./run-agent.js";
 import { startWeeklyFromEnv } from "./schedule.js";
 import { APPROVE_ACTION, REJECT_ACTION } from "./slack-approval.js";
@@ -36,7 +38,6 @@ let botUserId: string | undefined;
 const stripBotMention = (text: string) =>
   botUserId ? text.replaceAll(`<@${botUserId}>`, "").trim() : text.trim();
 
-const DRAFT_REQUEST = /^(please\s+)?(draft|generate|write)\b.*\b(update|digest|summary|recap)\b/i;
 
 const emailCache = new Map<string, string | undefined>();
 
@@ -102,6 +103,13 @@ async function handleMessage(
     return;
   }
 
+  // The first part replaces "thinking"; any overflow follows in the thread.
+  const reply = async (text: string) => {
+    const [first, ...rest] = splitForSlack(text);
+    await client.chat.update({ channel, ts: thinkingTs, text: first });
+    for (const part of rest) await client.chat.postMessage({ channel, thread_ts: threadTs, text: part });
+  };
+
   let lastProgress = "";
   const onProgress = (progress: string) => {
     if (progress === lastProgress) return;
@@ -112,11 +120,12 @@ async function handleMessage(
 
   try {
     if (!draft && DRAFT_REQUEST.test(userMessage)) {
-      const { draft: created, summary } = await generateDraft(actor, onProgress);
+      // The whole message doubles as the check-in ("btw I also worked on…").
+      const { draft: created, summary } = await generateDraft(actor, onProgress, userMessage);
       const where = created.preview
-        ? `It's waiting for approval in <#${created.preview.channel}>.`
-        : `Nothing posts until someone approves it.\n\n${renderDraftMrkdwn(created)}`;
-      await client.chat.update({ channel, ts: thinkingTs, text: `${summary}\n\n${where}` });
+        ? `Waiting for approval in <#${created.preview.channel}>. Nothing posts until someone approves it.`
+        : "Nothing posts until someone approves it in the inbox.";
+      await reply(`${finalMessage(created)}\n\n———\n_${where}_\n${summary}`);
       return;
     }
 
@@ -138,11 +147,7 @@ async function handleMessage(
 
     const { text: response } = await runAgent(prompt, { mode: "chat", actor, draftId: draft?.id, question: userMessage, onProgress });
 
-    await client.chat.update({
-      channel,
-      ts: thinkingTs,
-      text: response || "I couldn't find an answer. Try rephrasing your question.",
-    });
+    await reply(response || "I couldn't find an answer. Try rephrasing your question.");
   } catch (error) {
     console.error("Agent error:", error);
     try {
