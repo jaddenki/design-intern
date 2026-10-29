@@ -10,6 +10,15 @@ export interface VaultConfig {
   clientSecret: string;
 }
 
+/** Agent Vault labels: up to 128 characters, no line breaks, tabs, or invisible characters. */
+export function sessionLabel(text: string): string {
+  return text
+    .replace(/[\p{Cc}\p{Cf}]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 128);
+}
+
 export function createVault({ domain, clientId, clientSecret }: VaultConfig) {
   const base = domain.replace(/\/+$/, "");
   let cached: { token: string; expiresAt: number } | undefined;
@@ -44,11 +53,12 @@ export function createVault({ domain, clientId, clientSecret }: VaultConfig) {
   }
 
   return {
-    async createSession(bundle: string, ttl: string): Promise<{ id: string; token: string }> {
+    /** `label` shows in Agent Vault's Sessions list (searchable), up to 128 characters. */
+    async createSession(bundle: string, ttl: string, label?: string): Promise<{ id: string; token: string }> {
       const { session } = await request<{ session: { id: string; token: string } }>(
         "POST",
         "/api/v1/agent-vault/sessions",
-        { accessBundles: [bundle], ttl },
+        { accessBundles: [bundle], ttl, ...(label && { label: sessionLabel(label) }) },
         await accessToken(),
       );
       return { id: session.id, token: session.token };

@@ -187,7 +187,8 @@ export async function runInSandbox(
   try {
     // Minted while the sandbox boots; both are cleaned up in finally.
     const [s, sb] = await Promise.allSettled([
-      vault.createSession(cfg.bundle, ttl),
+      // Matches runs.jsonl's runId, so a session in Agent Vault traces back to its run and asker.
+      vault.createSession(cfg.bundle, ttl, `${cfg.appName} · ${ctx.mode} · ${ctx.actor} · ${ctx.runId.slice(0, 8)}`),
       client.sandboxes.create(app, image, {
         timeoutMs: cfg.timeoutMs,
         idleTimeoutMs: IDLE_TIMEOUT_MS,

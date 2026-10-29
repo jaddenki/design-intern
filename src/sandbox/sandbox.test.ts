@@ -12,6 +12,7 @@ const { bootstrapScript, modalConfig } = await import("./runner.js");
 const { pinnedDependencies } = await import("./image.js");
 const { memorySink } = await import("../drafts/sink.js");
 const { createRunContext } = await import("../run-context.js");
+const { sessionLabel } = await import("./vault.js");
 const { getDraft, newDraftId, saveDraft } = await import("../drafts/store.js");
 type Draft = import("../drafts/types.js").Draft;
 
@@ -52,6 +53,12 @@ test("sandbox env forwards scope config and placeholders, never real credentials
   assert.equal(env.ANTHROPIC_API_KEY, "__anthropic_api_key__");
   assert.equal(env.LINEAR_API_KEY, undefined);
   assert.ok(!JSON.stringify(env).includes("real") && !JSON.stringify(env).includes("secret"));
+});
+
+test("session labels fit Agent Vault's rules", () => {
+  assert.equal(sessionLabel("design-intern · chat · slack:a@b.com · 3f9a2c1e"), "design-intern · chat · slack:a@b.com · 3f9a2c1e");
+  assert.equal(sessionLabel("a\nb\tc\u200bd"), "a b c d");
+  assert.equal(sessionLabel("x".repeat(200)).length, 128);
 });
 
 test("events round-trip; other stdout is ignored", () => {
