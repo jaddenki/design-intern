@@ -12,7 +12,8 @@ const { bootstrapScript, modalConfig } = await import("./runner.js");
 const { pinnedDependencies } = await import("./image.js");
 const { memorySink } = await import("../drafts/sink.js");
 const { createRunContext } = await import("../run-context.js");
-const { sessionLabel } = await import("./vault.js");
+const { describeRun, sessionLabel } = await import("./vault.js");
+const { containsSecret } = await import("../secret-guard.js");
 const { getDraft, newDraftId, saveDraft } = await import("../drafts/store.js");
 type Draft = import("../drafts/types.js").Draft;
 
@@ -59,6 +60,24 @@ test("session labels fit Agent Vault's rules", () => {
   assert.equal(sessionLabel("design-intern · chat · slack:a@b.com · 3f9a2c1e"), "design-intern · chat · slack:a@b.com · 3f9a2c1e");
   assert.equal(sessionLabel("a\nb\tc\u200bd"), "a b c d");
   assert.equal(sessionLabel("x".repeat(200)).length, 128);
+});
+
+test("session labels lead with the task, then who asked and the run id", () => {
+  const runId = "f283e746-0000-0000-0000-000000000000";
+  assert.equal(
+    describeRun({ mode: "chat", actor: "slack:jadden@infisical.com", runId, question: "give me full white logo png" }),
+    "Give me full white logo png · jadden · f283e746",
+  );
+  assert.equal(describeRun({ mode: "draft", actor: "web:Jadden", runId }), "Weekly design update draft · Jadden · f283e746");
+  assert.equal(
+    describeRun({ mode: "chat", actor: "slack:j@x.com", runId, question: "drop the banner line", draftWindow: { since: "2026-10-22T00:00:00Z", until: "2026-10-29T00:00:00Z" } }),
+    "Revise Oct 22 – Oct 29 draft: Drop the banner line · j · f283e746",
+  );
+  assert.equal(
+    describeRun({ mode: "chat", actor: "cli", runId, question: "use xoxb-123456789012-abcdefgh", secretLike: containsSecret }),
+    "Chat question · cli · f283e746",
+  );
+  assert.ok(describeRun({ mode: "chat", actor: "cli", runId, question: "x".repeat(300) }).length <= 128);
 });
 
 test("events round-trip; other stdout is ignored", () => {

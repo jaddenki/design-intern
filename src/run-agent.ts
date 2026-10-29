@@ -122,8 +122,16 @@ export async function runAgent(prompt: string, options: RunAgentOptions = {}): P
   try {
     let result: string;
     if (AGENT_RUNNER === "modal") {
-      const { runInSandbox } = await import("./sandbox/runner.js");
-      result = await runInSandbox(prompt, ctx, draft, model, onProgress);
+      const [{ runInSandbox }, { describeRun }] = await Promise.all([import("./sandbox/runner.js"), import("./sandbox/vault.js")]);
+      const label = describeRun({
+        mode,
+        actor,
+        runId: ctx.runId,
+        question: options.question,
+        draftWindow: draft?.window,
+        secretLike: containsSecret,
+      });
+      result = await runInSandbox(prompt, ctx, draft, model, onProgress, label);
     } else {
       result = await runInProcess(prompt, ctx, draft, model, onProgress);
     }

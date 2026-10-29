@@ -156,6 +156,7 @@ export async function runInSandbox(
   draft: Draft | undefined,
   model: string,
   onProgress?: (message: string) => void,
+  label?: string,
 ): Promise<string> {
   const cfg = modalConfig();
   onProgress?.(`:brain: Using ${model}`);
@@ -187,8 +188,7 @@ export async function runInSandbox(
   try {
     // Minted while the sandbox boots; both are cleaned up in finally.
     const [s, sb] = await Promise.allSettled([
-      // Matches runs.jsonl's runId, so a session in Agent Vault traces back to its run and asker.
-      vault.createSession(cfg.bundle, ttl, `${cfg.appName} · ${ctx.mode} · ${ctx.actor} · ${ctx.runId.slice(0, 8)}`),
+      vault.createSession(cfg.bundle, ttl, label ?? `${ctx.mode} · ${ctx.actor} · ${ctx.runId.slice(0, 8)}`),
       client.sandboxes.create(app, image, {
         timeoutMs: cfg.timeoutMs,
         idleTimeoutMs: IDLE_TIMEOUT_MS,
