@@ -13,6 +13,8 @@ export function sourceLabel(ref: SourceRef): string {
       return "Figma";
     case "doc":
       return ref.title;
+    case "note":
+      return "check-in";
   }
 }
 

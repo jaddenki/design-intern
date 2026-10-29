@@ -89,10 +89,11 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, pa
   }
 
   if (method === "POST" && pathname === "/api/drafts/generate") {
-    await readJson(req);
+    const body = await readJson(req);
+    const checkIn = typeof body.checkIn === "string" ? body.checkIn : undefined;
     const send = stream(res);
     try {
-      const { draft, summary: text } = await generateDraft(actor, (m) => send({ type: "progress", text: m }));
+      const { draft, summary: text } = await generateDraft(actor, (m) => send({ type: "progress", text: m }), checkIn);
       send({ type: "result", text, draftId: draft.id });
     } catch (err) {
       console.error("Web generate failed:", err);

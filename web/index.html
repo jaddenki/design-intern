@@ -32,6 +32,18 @@
           <p class="empty-title">No draft selected</p>
           <p class="empty-copy">Draft this week’s update to review it here. Nothing posts to Slack until you approve it.</p>
         </section>
+        <section id="checkin" class="checkin" hidden>
+          <div class="checkin-head">
+            <div class="label">Check-in</div>
+            <h2 class="checkin-title">What did you work on this week?</h2>
+            <p class="checkin-copy">Anything Linear, GitHub, Slack, or Figma won’t show: calls, explorations, reviews, ideas for next week. Optional; it becomes a source the draft can cite.</p>
+          </div>
+          <textarea id="checkin-text" rows="6" placeholder="Off the top of my head…"></textarea>
+          <div class="checkin-actions">
+            <button class="btn" id="checkin-cancel" type="button">Cancel</button>
+            <button class="btn btn-primary" id="checkin-go" type="button">Draft update</button>
+          </div>
+        </section>
         <section id="progress" class="progress" hidden aria-live="polite">
           <div class="label">Drafting</div>
           <ol class="progress-steps" id="progress-steps"></ol>

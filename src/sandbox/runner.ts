@@ -164,6 +164,7 @@ export async function runInSandbox(
     actor: ctx.actor,
     runId: ctx.runId,
     draft,
+    seed: [...ctx.sources.values()],
     env: { ...sandboxEnv(), DATA_DIR: "/tmp/design-intern-data", CLAUDE_CODE_EXECUTABLE: CLAUDE_BINARY },
   };
   const ttl = `${Math.ceil((cfg.timeoutMs + SESSION_MARGIN_MS) / 60_000)}m`;

@@ -95,6 +95,13 @@ test("host rebuilds a new draft: its own id, pending, its own actor", () => {
   assert.deepEqual(Object.keys(saved.sources), ["linear:DES-1"]);
 });
 
+test("a check-in is a citable source on the host", () => {
+  const note = { id: "note:checkin", kind: "note" as const, title: "Check-in from web:Jadden" };
+  const ctx = createRunContext({ mode: "draft", actor: "web:Jadden", seed: [note] });
+  acceptResult(result([candidate({ lines: [line(["note:checkin"])] })], [note]), ctx, undefined);
+  assert.equal(getDraft(ctx.savedDraftId!)!.sources["note:checkin"]?.kind, "note");
+});
+
 test("host rejects uncited lines, bad sources, and drafts outside drafting runs", () => {
   const ctx = () => createRunContext({ mode: "draft", actor: "t" });
   assert.throws(() => acceptResult(result([candidate({ lines: [line(["linear:FAKE"])] })]), ctx(), undefined), /invalid draft/);

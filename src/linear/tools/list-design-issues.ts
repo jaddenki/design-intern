@@ -13,6 +13,8 @@ function render(issue: LinearIssue): string {
   const meta = [
     `state: ${issue.state} (${issue.stateType})`,
     issue.assignee && `assignee: ${issue.assignee}`,
+    issue.priority && `priority: ${issue.priority}`,
+    issue.dueDate && `due: ${issue.dueDate}`,
     issue.project && `project: ${issue.project}`,
     issue.labels.length > 0 && `labels: ${issue.labels.join(", ")}`,
     `updated: ${issue.updatedAt}`,
@@ -42,7 +44,7 @@ function render(issue: LinearIssue): string {
 export function listDesignIssuesTool(ctx: RunContext) {
   return tool(
     "list_design_issues",
-    "List Linear issues for the design team that changed in the reporting window (default the last 7 days). Scoped to the configured design team(s) and/or assignees; takes no scope argument. Each issue shows its state category (completed = shipped), dates, assignee, project, attached links (often Figma files or GitHub PRs), and recent comments. Cite issues by their source_id.",
+    "List Linear issues for the design team that changed in the reporting window (default the last 7 days), plus open issues (todo or in progress) that didn't change, as candidates for what to pick up next. Scoped to the configured design team(s) and/or assignees; takes no scope argument. Each issue shows its state category (completed = shipped), dates, assignee, project, attached links (often Figma files or GitHub PRs), and recent comments. Cite issues by their source_id.",
     {
       days: z.number().int().min(1).max(14).optional().describe("Window length in days, default 7."),
     },
@@ -54,12 +56,13 @@ export function listDesignIssuesTool(ctx: RunContext) {
         "I couldn't reach Linear just now.",
         async () => {
           const w = windowFor(ctx, args.days);
-          const { issues, truncated } = await listDesignIssues(w);
-          for (const issue of issues) {
+          const { issues, open, truncated } = await listDesignIssues(w);
+          for (const issue of [...issues, ...open]) {
             recordSource(ctx, { id: sourceId(issue), kind: "linear", title: `${issue.identifier} ${issue.title}`, url: issue.url });
           }
           const header = `Linear issues for ${describeScope(linearScope())} updated ${w.since.toISOString()} → ${w.until.toISOString()}: ${issues.length}${truncated ? " (truncated)" : ""}`;
-          return text([header, ...issues.map(render)].join("\n\n"));
+          const openHeader = `Open issues not updated in the window (todo or in progress), candidates for next: ${open.length}`;
+          return text([header, ...issues.map(render), openHeader, ...open.map(render)].join("\n\n"));
         },
         "Linear API error:",
       );

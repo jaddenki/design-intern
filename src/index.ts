@@ -9,7 +9,8 @@ const progress = (m: string) => console.error(`  ${m}`);
 console.log(`\nPrompt: ${prompt}\n`);
 try {
   if (prompt === "draft") {
-    const { draft, summary } = await generateDraft("cli", progress);
+    // `npm run draft -- "what I worked on"` passes a check-in.
+    const { draft, summary } = await generateDraft("cli", progress, process.argv[3]);
     console.log(`${summary}\n\n${renderDraftMrkdwn(draft)}\n\nNotes:\n${draft.notes.map((n) => `- ${n}`).join("\n")}\n\nSaved as ${draft.id} (pending).`);
   } else {
     const { text } = await runAgent(prompt, { onProgress: progress });

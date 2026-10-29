@@ -37,6 +37,7 @@
   --k-slack: #611f69;
   --k-figma: #e2552d;
   --k-doc: #6f6f6f;
+  --k-note: var(--accent);
 
   --sans: "AllianceNo2", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "JetBrains Mono", ui-monospace, monospace;
@@ -233,6 +234,33 @@ a { color: inherit; }
 .progress-steps li:last-child { color: var(--ink); }
 .progress-steps li:last-child::after { content: "▍"; margin-left: 4px; color: var(--accent); }
 
+/* Check-in stands in for the draft while it's open, so it floats the same way */
+.checkin {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px;
+  background: var(--card);
+  box-shadow: var(--ring), var(--hero);
+}
+.checkin-title { margin: 6px 0 0; font-size: 22px; font-weight: 500; line-height: 1.15; }
+.checkin-copy { margin: 8px 0 16px; font-size: 13px; color: var(--ink-3); max-width: 56ch; }
+.checkin textarea {
+  display: block;
+  width: 100%;
+  resize: vertical;
+  min-height: 120px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 0;
+  background: var(--well);
+  box-shadow: var(--sunk);
+  outline: none;
+  transition: box-shadow var(--dur) var(--ease-out), background var(--dur) var(--ease-out);
+}
+.checkin textarea::placeholder { color: var(--ink-4); }
+.checkin textarea:focus { background: var(--card); box-shadow: var(--sunk), var(--halo); }
+.checkin-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
 /* The draft is the one floating object */
 .draft {
   max-width: 760px;
@@ -329,6 +357,7 @@ a { color: inherit; }
 .k-slack { --k: var(--k-slack); }
 .k-figma { --k: var(--k-figma); }
 .k-doc { --k: var(--k-doc); }
+.k-note { --k: var(--k-note); }
 
 .trace { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 220ms var(--ease-out); }
 .line.is-open .trace { grid-template-rows: 1fr; }

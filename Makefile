@@ -10,7 +10,7 @@ RUN = npm run build >/dev/null && infisical run --env=$(SECRETS_ENV) --path=$(SE
 
 help:
 	@echo "make web            inbox at localhost:3000 (any name, password: $(INBOX_PASSWORD))"
-	@echo "make draft          draft this week's update from the CLI"
+	@echo "make draft          draft this week's update (NOTE='what I worked on' adds a check-in)"
 	@echo "make ask Q='...'    one-off question from the CLI"
 	@echo "make slack          run the Slack bot (also serves the inbox)"
 	@echo "make eval RUNS=3    score drafts on the fictional eval week (fixtures/expected.json)"
@@ -26,7 +26,7 @@ web: check-init
 	$(RUN) WEB_ACCESS_PASSWORD=$(INBOX_PASSWORD) npm run web
 
 draft: check-init
-	$(RUN) npm run draft
+	$(RUN) npm run draft $(if $(NOTE),-- "$(NOTE)")
 
 ask: check-init
 	@test -n "$(Q)" || { echo "Usage: make ask Q='What are our brand colors?'"; exit 1; }

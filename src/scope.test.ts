@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { loadFixture } from "./fixtures.js";
 import { inScope as githubInScope, normalize as normalizePr, type PullResponse } from "./github/client.js";
-import { inScope as linearInScope, issueFilter, normalize as normalizeIssue } from "./linear/client.js";
+import { inOpenScope, inScope as linearInScope, issueFilter, normalize as normalizeIssue, openIssueFilter } from "./linear/client.js";
 import type { LinearIssueNode } from "./linear/types.js";
 import type { TimeWindow } from "./run-context.js";
 import { scopeThreads, type RawChannel } from "./slack-source/client.js";
@@ -35,6 +35,17 @@ test("linear: the query filter carries only the scopes that are set", () => {
   const since = new Date("2026-10-16T00:00:00Z");
   assert.deepEqual(Object.keys(issueFilter({ teams: [], assignees: ["a@x.com"] }, since)).sort(), ["assignee", "updatedAt"]);
   assert.deepEqual(Object.keys(issueFilter({ teams: ["DES"], assignees: [] }, since)).sort(), ["team", "updatedAt"]);
+});
+
+test("linear: open todos count regardless of age, but only open ones in scope", () => {
+  const issues = loadFixture<LinearIssueNode[]>("linear").map(normalizeIssue);
+  const scope = { teams: ["DES"], assignees: [] };
+  const open = issues.filter((i) => inOpenScope(i, scope)).map((i) => i.identifier);
+  assert.ok(open.includes("DES-155"));
+  assert.ok(!open.includes("DES-142") && !open.includes("DES-120") && !open.includes("ENG-880"));
+  const old = { ...issues.find((i) => i.identifier === "DES-155")!, updatedAt: "2025-01-01T00:00:00Z" };
+  assert.ok(inOpenScope(old, scope) && !linearInScope(old, scope, w));
+  assert.deepEqual(Object.keys(openIssueFilter({ teams: [], assignees: ["a@x.com"] })).sort(), ["assignee", "state"]);
 });
 
 test("github: allowlisted repos, design authors, inside the window", () => {

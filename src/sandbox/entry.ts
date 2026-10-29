@@ -25,7 +25,7 @@ async function main() {
     mode: job.mode,
     actor: job.actor,
     draftId: job.draft?.id,
-    seed: job.draft ? Object.values(job.draft.sources) : [],
+    seed: job.seed,
     drafts,
   });
   ctx.runId = job.runId;

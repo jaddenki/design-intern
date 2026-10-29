@@ -9,6 +9,8 @@ export interface Job {
   actor: string;
   runId: string;
   draft?: Draft;
+  /** Sources citable from the start: the draft's, plus a check-in. */
+  seed: SourceRef[];
   env: Record<string, string>;
 }
 

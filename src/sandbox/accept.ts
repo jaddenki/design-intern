@@ -9,7 +9,7 @@ import type { SandboxEvent } from "./job.js";
 
 type Result = Extract<SandboxEvent, { type: "result" }>;
 
-const KINDS: SourceKind[] = ["linear", "github", "slack", "figma", "doc"];
+const KINDS: SourceKind[] = ["linear", "github", "slack", "figma", "doc", "note"];
 const isString = (v: unknown): v is string => typeof v === "string";
 
 function asSource(v: unknown): SourceRef | undefined {

@@ -8,7 +8,7 @@ It's built on the Claude Agent SDK. Following [Infisical/modal-agent](https://gi
 
 In Slack (@mention or DM) or in the web inbox's chat pane:
 
-- "Draft this week's design update." → drafts, saves as pending, sends an approval preview
+- "Draft this week's design update." → drafts, saves as pending, sends an approval preview. In the inbox it first asks what you worked on; that check-in becomes a source the draft can cite (`make draft NOTE='…'` from the CLI).
 - In the preview's thread: "Why is the login redesign a risk?" / "Drop the icon line." → explains or revises the pending draft
 - "Where's the component library?" → answers from `knowledge/`, or says it isn't documented
 
@@ -74,7 +74,7 @@ Slack app scopes: `app_mentions:read`, `chat:write`, `im:history`, `channels:his
 
 Each source fails closed when its scope is empty, and the model can't pass a scope argument.
 
-- **Linear:** `LINEAR_ASSIGNEE_EMAILS` (issues assigned to these people) and/or `LINEAR_TEAM_KEYS`. With both set, an issue must match both. Add people as the team grows.
+- **Linear:** `LINEAR_ASSIGNEE_EMAILS` (issues assigned to these people) and/or `LINEAR_TEAM_KEYS`. With both set, an issue must match both. Add people as the team grows. The agent sees issues that changed this week plus open ones (todo or in progress) that didn't, and suggests up to three of those for "Up next".
 - **GitHub:** `GITHUB_REPOS` plus `DESIGN_GITHUB_LOGINS` (PR authors).
 - **Slack:** `DESIGN_SLACK_CHANNELS` (channel ids).
 - **Figma:** `FIGMA_PROJECT_IDS` (every file in those folders) and/or `FIGMA_FILE_KEYS`.

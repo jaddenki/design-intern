@@ -5,7 +5,7 @@ import { DEFAULT_WINDOW_DAYS, MAX_WINDOW_DAYS, USE_FIXTURES } from "./config.js"
 import { storeSink, type DraftSink } from "./drafts/sink.js";
 import { fixtureNow } from "./fixtures.js";
 
-export type SourceKind = "linear" | "github" | "slack" | "figma" | "doc";
+export type SourceKind = "linear" | "github" | "slack" | "figma" | "doc" | "note";
 
 export interface SourceRef {
   /** Stable id the model cites, e.g. "linear:DES-142" or "github:org/repo#12". */

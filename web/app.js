@@ -6,7 +6,7 @@ const SECTIONS = [
   ["risks", "Blocked & risks"],
   ["next", "Up next"],
 ];
-const KIND_LABEL = { linear: "Linear", github: "GitHub", slack: "Slack", figma: "Figma", doc: "Doc" };
+const KIND_LABEL = { linear: "Linear", github: "GitHub", slack: "Slack", figma: "Figma", doc: "Doc", note: "Check-in" };
 
 const $ = (id) => document.getElementById(id);
 const state = { drafts: [], current: null, chat: [], busy: false };
@@ -124,6 +124,7 @@ function chipLabel(ref) {
   if (ref.kind === "github") return `#${ref.id.split("#").pop()}`;
   if (ref.kind === "slack") return ref.title.split(":")[0];
   if (ref.kind === "figma") return "Figma";
+  if (ref.kind === "note") return "Check-in";
   return ref.title;
 }
 
@@ -205,6 +206,7 @@ function renderLine(line, draft, editable) {
 
 function renderDraft() {
   const d = state.current;
+  $("checkin").hidden = true;
   $("empty").hidden = Boolean(d);
   $("draft").hidden = !d;
   $("context-toggle").hidden = !d;
@@ -308,8 +310,24 @@ function confirmAction(btn) {
   return false;
 }
 
+function openCheckIn() {
+  if (state.busy) return;
+  $("empty").hidden = true;
+  $("draft").hidden = true;
+  $("progress").hidden = true;
+  $("checkin").hidden = false;
+  $("checkin-text").focus();
+}
+
+function closeCheckIn() {
+  $("checkin").hidden = true;
+  renderDraft();
+}
+
 async function generate() {
   if (state.busy) return;
+  const checkIn = $("checkin-text").value.trim();
+  $("checkin").hidden = true;
   state.busy = true;
   $("generate").disabled = true;
   $("empty").hidden = true;
@@ -318,13 +336,14 @@ async function generate() {
   const steps = $("progress-steps");
   steps.replaceChildren(h("li", {}, "Starting…"));
   try {
-    await streamApi("/api/drafts/generate", {}, async (ev) => {
+    await streamApi("/api/drafts/generate", { checkIn }, async (ev) => {
       if (ev.type === "progress") {
         const text = stripEmoji(ev.text);
         if (steps.lastElementChild?.textContent !== text) steps.append(h("li", {}, text));
       }
       if (ev.type === "error") throw new Error(ev.text);
       if (ev.type === "result") {
+        $("checkin-text").value = "";
         await refresh();
         await openDraft(ev.draftId);
         addMessage("agent", ev.text);
@@ -392,7 +411,13 @@ async function refresh() {
   return s;
 }
 
-$("generate").addEventListener("click", generate);
+$("generate").addEventListener("click", openCheckIn);
+$("checkin-go").addEventListener("click", generate);
+$("checkin-cancel").addEventListener("click", closeCheckIn);
+$("checkin-text").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) generate();
+  if (e.key === "Escape") closeCheckIn();
+});
 $("chat-form").addEventListener("submit", (e) => {
   e.preventDefault();
   const input = $("chat-input");

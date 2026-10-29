@@ -14,6 +14,8 @@ export interface LinearIssue {
   stateType: string;
   assignee: string | null;
   assigneeEmail: string | null;
+  priority: string | null;
+  dueDate: string | null;
   project: string | null;
   labels: string[];
   description: string;
@@ -38,6 +40,8 @@ export interface LinearIssueNode {
   team: { key: string };
   state: { name: string; type: string };
   assignee: { name: string; email?: string | null } | null;
+  priorityLabel?: string | null;
+  dueDate?: string | null;
   project: { name: string } | null;
   labels: { nodes: { name: string }[] };
   attachments: { nodes: { title: string | null; url: string }[] };

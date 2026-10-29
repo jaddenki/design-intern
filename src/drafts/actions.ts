@@ -24,11 +24,15 @@ function requirePending(id: string): Draft {
 }
 
 /** One generation at a time; a second caller gets the in-flight run. */
-export function generateDraft(actor: string, onProgress?: (m: string) => void): Promise<{ draft: Draft; summary: string }> {
+export function generateDraft(
+  actor: string,
+  onProgress?: (m: string) => void,
+  checkIn?: string,
+): Promise<{ draft: Draft; summary: string }> {
   generating ??= (async () => {
     try {
       const now = createRunContext({ mode: "draft", actor }).now;
-      const { text, ctx } = await runAgent(weeklyDraftPrompt(now), { mode: "draft", actor, onProgress });
+      const { text, ctx } = await runAgent(weeklyDraftPrompt(now), { mode: "draft", actor, onProgress, checkIn });
       const draft = ctx.savedDraftId ? getDraft(ctx.savedDraftId) : undefined;
       if (!draft) throw new Error(`The agent finished without saving a draft. It said: ${text.slice(0, 300)}`);
       const preview = await sendForApproval(draft).catch((err) => {
