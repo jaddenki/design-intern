@@ -155,7 +155,9 @@ export async function runInSandbox(
   onProgress?: (message: string) => void,
 ): Promise<string> {
   const cfg = modalConfig();
+  onProgress?.(":package: Preparing the sandbox image (a few minutes after a dependency change)…");
   const { client, app, image, proxySecret, vault } = await connect(cfg);
+  onProgress?.(":lock: Starting a sandbox and an Agent Vault session…");
   const job: Job = {
     prompt,
     mode: ctx.mode,
@@ -187,10 +189,12 @@ export async function runInSandbox(
     if (s.status === "rejected") throw s.reason;
     if (sb.status === "rejected") throw sb.reason;
 
+    onProgress?.(":shield: Sandbox up; starting Agent Proxy…");
     await sandbox!.filesystem.copyFromLocal(bundleFile, "/tmp/app.tgz");
     await rootExec(sandbox!, `tar -xzf /tmp/app.tgz -C ${APP_DIR} && rm /tmp/app.tgz`, "Installing the app");
     await startProxy(sandbox!, image, proxySecret);
 
+    onProgress?.(":robot_face: Agent started…");
     const proc = await sandbox!.exec(["runuser", "-u", SANDBOX_USER, "--", "sh", "-c", bootstrapScript(cfg.caFingerprint)], {
       mode: "text",
       stdout: "pipe",
