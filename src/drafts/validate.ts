@@ -7,11 +7,13 @@ import { SECTIONS, type Section } from "./types.js";
 
 export const MAX_LINES = 30;
 const MAX_LINE_CHARS = 400;
+const MAX_GROUP_CHARS = 40;
 
 export interface ProposedLine {
   section: string;
   text: string;
   sourceIds: string[];
+  group?: string;
 }
 
 export function validateLines(lines: ProposedLine[], known: ReadonlyMap<string, SourceRef>): string[] {
@@ -24,6 +26,8 @@ export function validateLines(lines: ProposedLine[], known: ReadonlyMap<string, 
     if (!line.text.trim()) errors.push(`${n}: text is empty.`);
     if (line.text.length > MAX_LINE_CHARS) errors.push(`${n}: text is over ${MAX_LINE_CHARS} characters.`);
     if (containsSecret(line.text)) errors.push(`${n}: text looks like it contains a credential; remove it.`);
+    if (line.group !== undefined && line.group.length > MAX_GROUP_CHARS) errors.push(`${n}: group is over ${MAX_GROUP_CHARS} characters.`);
+    if (line.group && containsSecret(line.group)) errors.push(`${n}: group looks like it contains a credential; remove it.`);
     if (line.sourceIds.length === 0) errors.push(`${n}: cites no sources. Every line needs at least one source_id.`);
     const unknown = line.sourceIds.filter((id) => !known.has(id));
     if (unknown.length > 0) {

@@ -23,7 +23,13 @@ function asLines(v: unknown): DraftLine[] | undefined {
   if (!Array.isArray(v)) return undefined;
   const lines = v.map((l) =>
     l && isString(l.section) && isString(l.text) && Array.isArray(l.sourceIds) && l.sourceIds.every(isString)
-      ? { id: randomUUID().slice(0, 8), section: l.section, text: l.text.trim(), sourceIds: [...new Set<string>(l.sourceIds)] }
+      ? {
+          id: randomUUID().slice(0, 8),
+          section: l.section,
+          text: l.text.trim(),
+          sourceIds: [...new Set<string>(l.sourceIds)],
+          ...(isString(l.group) && l.group.trim() && { group: l.group.trim() }),
+        }
       : undefined,
   );
   return lines.every(Boolean) ? (lines as DraftLine[]) : undefined;

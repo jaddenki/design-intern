@@ -17,6 +17,9 @@ export const CHAT_MODEL = process.env.CHAT_MODEL?.trim() || "claude-sonnet-5-5";
 
 export const DATA_DIR = path.resolve(APP_ROOT, process.env.DATA_DIR?.trim() || "data");
 
+// The posted message. {{last_week}}, {{priorities}}, and {{date_range}} are filled in.
+export const UPDATE_TEMPLATE = path.resolve(APP_ROOT, process.env.UPDATE_TEMPLATE?.trim() || "templates/weekly-update.md");
+
 export const KNOWLEDGE_DIR = path.resolve(
   APP_ROOT,
   process.env.DESIGN_KNOWLEDGE_DIR?.trim() || (USE_FIXTURES ? "fixtures/knowledge" : "knowledge"),

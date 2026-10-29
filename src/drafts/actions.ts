@@ -93,6 +93,29 @@ export interface LineEdit {
 }
 
 /** Human edits: reword, move, or drop lines. Humans can't attach new sources. */
+const MAX_MESSAGE_CHARS = 8_000;
+
+/** Hand-edit the Slack message that will post, or pass null to go back to the template. */
+export async function editMessage(id: string, by: string, text: string | null): Promise<Draft> {
+  const draft = requirePending(id);
+  if (text === null) {
+    if (!draft.message) return draft;
+    delete draft.message;
+    log(draft, by, "edited", "reset the Slack message to the template");
+  } else {
+    const next = text.trim();
+    if (!next) throw new Error("The message can't be empty.");
+    if (next.length > MAX_MESSAGE_CHARS) throw new Error(`Keep the message under ${MAX_MESSAGE_CHARS.toLocaleString()} characters.`);
+    if (containsSecret(next)) throw new Error("That message looks like it contains a credential.");
+    if (next === draft.message?.text) return draft;
+    draft.message = { text: next, by, at: new Date().toISOString() };
+    log(draft, by, "edited", "edited the Slack message");
+  }
+  saveDraft(draft);
+  await refreshPreview(draft);
+  return draft;
+}
+
 export async function editDraft(id: string, by: string, edits: LineEdit[]): Promise<Draft> {
   const draft = requirePending(id);
   const changes: string[] = [];

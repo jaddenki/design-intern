@@ -101,10 +101,10 @@ function prose(src) {
   const out = [];
   let list = null;
   for (const raw of esc.split("\n")) {
-    const m = raw.match(/^\s*(?:•|-|\*)\s+(.*)$/);
+    const m = raw.match(/^(\s*)(?:•|-|\*|◦)\s+(.*)$/);
     if (m) {
       list ??= [];
-      list.push(`<li>${inline(m[1])}</li>`);
+      list.push(m[1] ? `<li class="sub">${inline(m[2])}</li>` : `<li>${inline(m[2])}</li>`);
       continue;
     }
     if (list) {
@@ -272,6 +272,7 @@ function renderDraft() {
         ? h("aside", { class: "notes" }, h("div", { class: "label" }, "For you to check"), h("ul", {}, d.notes.map((n) => h("li", {}, n))))
         : null,
       ...sections,
+      renderMessage(d, editable),
       h(
         "details",
         { class: "history" },
@@ -280,6 +281,50 @@ function renderDraft() {
       ),
     ),
   );
+}
+
+/* The exact Slack message. Editable while pending; a saved edit posts instead of the template. */
+function renderMessage(d, editable) {
+  const preview = h("div", { class: "message-preview msg-agent" });
+  preview.innerHTML = mrkdwn(d.rendered);
+  const head = h("div", { class: "message-head" }, h("h2", { class: "label" }, "Slack message"));
+  if (!editable) return h("section", { class: "message" }, head, preview);
+
+  const text = h("textarea", { class: "message-text", id: "message-text", rows: "12", spellcheck: "true" });
+  text.value = d.rendered;
+  const save = h("button", { class: "btn btn-primary", type: "button", disabled: true, onclick: () => saveMessage(text.value) }, "Save message");
+  text.addEventListener("input", () => {
+    preview.innerHTML = mrkdwn(text.value);
+    save.disabled = !messageDirty();
+  });
+  const reset = d.message ? h("button", { class: "btn", type: "button", onclick: () => saveMessage(null) }, "Reset to template") : null;
+  const note = d.message
+    ? `Edited by ${d.message.by}. Line edits above won’t change it until you reset.`
+    : "Generated from your template. Edit it here before you approve; what you see is what posts.";
+  return h(
+    "section",
+    { class: "message" },
+    head,
+    h("p", { class: "message-note" }, note),
+    h("div", { class: "message-grid" }, text, preview),
+    h("div", { class: "message-actions" }, reset, save),
+  );
+}
+
+function messageDirty() {
+  const text = document.getElementById("message-text");
+  return Boolean(text && state.current && text.value.trim() !== state.current.rendered.trim());
+}
+
+async function saveMessage(message) {
+  try {
+    state.current = await api(`/api/drafts/${state.current.id}`, { method: "PATCH", body: JSON.stringify({ message }) });
+    renderDraft();
+    toast(message === null ? "Message reset to the template." : "Message saved.");
+  } catch (err) {
+    toast(err.message);
+    throw err;
+  }
 }
 
 async function openDraft(id) {
@@ -297,6 +342,7 @@ async function approve(btn) {
   const d = state.current;
   if (!confirmAction(btn)) return;
   try {
+    if (messageDirty()) await saveMessage(document.getElementById("message-text").value);
     state.current = await api(`/api/drafts/${d.id}/approve`, { method: "POST", body: "{}" });
     toast(state.current.posted?.dryRun ? "Approved. Dry run: nothing was posted." : "Approved and posted to Slack.");
     await refresh();

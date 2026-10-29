@@ -17,6 +17,8 @@ export interface DraftLine {
   section: Section;
   text: string;
   sourceIds: string[];
+  /** Project or theme the line rolls up under in the posted message, e.g. "Website fixes". */
+  group?: string;
   /** Set when a human edited the agent's wording. */
   editedBy?: string;
 }
@@ -43,6 +45,8 @@ export interface Draft {
   /** Every source the generating run saw, keyed by id; cited ones are a subset. */
   sources: Record<string, SourceRef>;
   history: DraftEvent[];
+  /** A human's hand-edited Slack message; posts instead of the rendered template. */
+  message?: { text: string; by: string; at: string };
   preview?: { channel: string; ts: string };
   posted?: { channel: string; ts?: string; dryRun: boolean };
 }

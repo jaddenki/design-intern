@@ -11,6 +11,10 @@ const lineSchema = z.object({
   section: z.enum(SECTIONS).describe("Which part of the update this line belongs in."),
   text: z.string().describe("One crisp sentence a teammate can skim. No source ids in the text."),
   sourceIds: z.array(z.string()).describe("source_id values from tool results that support this line."),
+  group: z
+    .string()
+    .optional()
+    .describe('Short project or theme this line rolls up under in the posted message, e.g. "Website fixes" or "Misc design". Reuse the same label for related lines. Not needed for "next" lines.'),
 });
 
 const notesSchema = z
@@ -23,6 +27,7 @@ const toLines = (lines: ProposedLine[]): DraftLine[] =>
     section: l.section as DraftLine["section"],
     text: l.text.trim(),
     sourceIds: [...new Set(l.sourceIds)],
+    ...(l.group?.trim() && { group: l.group.trim() }),
   }));
 
 const rejection = (errors: string[]) =>

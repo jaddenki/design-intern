@@ -58,5 +58,6 @@ The agent runs as `user` (uid 2000) in the sandbox, not root: the `claude` binar
 | Add a native source | `src/<service>/client.ts` + `tools/`, register in `src/agent.ts`, label in `run-agent.ts` |
 | Add a third-party MCP server | `mcp-servers.json` only |
 | Update sections | `src/drafts/types.ts` (`SECTIONS`) and `web/app.js` |
+| Posted message layout | `templates/weekly-update.md`; rendering in `src/drafts/render.ts` (`renderDraftMrkdwn`, `finalMessage`) |
 | Approval message | `src/slack-approval.ts` |
 | Inbox UI | `web/` |

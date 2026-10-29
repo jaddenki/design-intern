@@ -18,6 +18,7 @@ COPY --from=builder /app/dist ./dist
 COPY web ./web
 COPY knowledge ./knowledge
 COPY mcp-servers.json ./
+COPY templates ./templates
 ENV AGENT_RUNNER=modal
 RUN chown -R node:node /app
 USER node

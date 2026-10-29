@@ -2,7 +2,7 @@
 // that posts an update is postApprovedUpdate, called after a human approves.
 import type { KnownBlock } from "@slack/web-api";
 import { USE_FIXTURES } from "./config.js";
-import { draftTitle, renderDraftMrkdwn } from "./drafts/render.js";
+import { draftTitle, finalMessage } from "./drafts/render.js";
 import type { Draft } from "./drafts/types.js";
 import { containsSecret } from "./secret-guard.js";
 import { isSlackConfigured, slackClient } from "./slack-client.js";
@@ -29,7 +29,7 @@ function clip(s: string): string {
 export function previewBlocks(draft: Draft): KnownBlock[] {
   const blocks: KnownBlock[] = [
     { type: "header", text: { type: "plain_text", text: `Draft for review · ${draftTitle(draft).replace("Design update · ", "")}` } },
-    { type: "section", text: { type: "mrkdwn", text: clip(renderDraftMrkdwn(draft)) } },
+    { type: "section", text: { type: "mrkdwn", text: clip(finalMessage(draft)) } },
   ];
   if (draft.notes.length > 0) {
     blocks.push({
@@ -78,7 +78,7 @@ export async function refreshPreview(draft: Draft): Promise<void> {
 /** Post an approved draft. Dry-runs during the eval or when no update channel is set. */
 export async function postApprovedUpdate(draft: Draft): Promise<NonNullable<Draft["posted"]>> {
   if (draft.status !== "approved") throw new Error(`Refusing to post draft ${draft.id}: status is ${draft.status}.`);
-  const body = renderDraftMrkdwn(draft);
+  const body = finalMessage(draft);
   if (containsSecret(body)) throw new Error(`Refusing to post draft ${draft.id}: it contains a credential-like string.`);
   const channel = updateChannel();
   if (!liveSlack() || !channel) return { channel: channel ?? "(not configured)", dryRun: true };

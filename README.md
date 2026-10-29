@@ -72,6 +72,12 @@ Run `make sync-brand` once (and whenever the brand changes) so brand questions h
 
 Slack app scopes: `app_mentions:read`, `chat:write`, `im:history`, `channels:history`, `groups:history`, `channels:read`, `users:read`, `users:read.email`. Turn on Interactivity (Socket Mode handles it) for the Approve and Reject buttons. Invite the bot to every design channel plus the approval and update channels.
 
+## The posted message
+
+`templates/weekly-update.md` is the Slack message that posts on approval. `{{last_week}}` becomes last week's lines grouped by project (the agent picks short groups like "Website fixes"), `{{priorities}}` becomes the numbered "next" list, and `{{date_range}}` the window. Change the greeting, emoji, and layout there; `UPDATE_TEMPLATE` points somewhere else.
+
+The inbox shows the exact message under each draft with a live preview. Edit it there before approving and your version posts instead; "Reset to template" goes back to the generated one.
+
 ## Scope
 
 Each source fails closed when its scope is empty, and the model can't pass a scope argument.

@@ -6,7 +6,9 @@ import { readFile } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
 import { AGENT_NAME, APP_ROOT } from "../config.js";
-import { approveDraft, editDraft, generateDraft, isGenerating, rejectDraft, type LineEdit } from "../drafts/actions.js";
+import { approveDraft, editDraft, editMessage, generateDraft, isGenerating, rejectDraft, type LineEdit } from "../drafts/actions.js";
+import { finalMessage, renderDraftMrkdwn } from "../drafts/render.js";
+import type { Draft } from "../drafts/types.js";
 import { getDraft, listDrafts } from "../drafts/store.js";
 import { runAgent } from "../run-agent.js";
 
@@ -126,26 +128,33 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, pa
     return res.end();
   }
 
+  // The inbox shows the exact Slack message next to the template's version.
+  const view = (draft: Draft) => ({ ...draft, rendered: finalMessage(draft), generated: renderDraftMrkdwn(draft) });
+
   const match = pathname.match(/^\/api\/drafts\/([a-z0-9_]+)(?:\/(approve|reject))?$/);
   if (!match) throw new HttpError(404, "Not found.");
   const [, id, action] = match;
 
   if (method === "GET" && !action) {
     const draft = getDraft(id);
-    return draft ? json(res, 200, draft) : json(res, 404, { error: "Draft not found." });
+    return draft ? json(res, 200, view(draft)) : json(res, 404, { error: "Draft not found." });
   }
   if (method === "PATCH" && !action) {
     const body = await readJson(req);
+    if ("message" in body) {
+      const message = typeof body.message === "string" ? body.message : null;
+      return json(res, 200, view(await editMessage(id, actor, message)));
+    }
     const edits = Array.isArray(body.edits) ? (body.edits as LineEdit[]) : [];
-    return json(res, 200, await editDraft(id, actor, edits));
+    return json(res, 200, view(await editDraft(id, actor, edits)));
   }
   if (method === "POST" && action === "approve") {
     await readJson(req);
-    return json(res, 200, await approveDraft(id, actor));
+    return json(res, 200, view(await approveDraft(id, actor)));
   }
   if (method === "POST" && action === "reject") {
     const body = await readJson(req);
-    return json(res, 200, await rejectDraft(id, actor, typeof body.reason === "string" ? body.reason : undefined));
+    return json(res, 200, view(await rejectDraft(id, actor, typeof body.reason === "string" ? body.reason : undefined)));
   }
   throw new HttpError(405, "Method not allowed.");
 }
