@@ -9,7 +9,7 @@ const SECTIONS = [
 const KIND_LABEL = { linear: "Linear", github: "GitHub", slack: "Slack", figma: "Figma", doc: "Doc", note: "Check-in" };
 
 const $ = (id) => document.getElementById(id);
-const state = { drafts: [], current: null, chat: [], busy: false };
+const state = { drafts: [], current: null, chat: [], drafting: false, chatting: false };
 
 function h(tag, attrs = {}, ...children) {
   const el = document.createElement(tag);
@@ -380,7 +380,7 @@ function confirmAction(btn) {
 }
 
 function openCheckIn() {
-  if (state.busy) return;
+  if (state.drafting) return;
   $("empty").hidden = true;
   $("draft").hidden = true;
   $("progress").hidden = true;
@@ -394,10 +394,10 @@ function closeCheckIn() {
 }
 
 async function generate() {
-  if (state.busy) return;
+  if (state.drafting) return;
   const checkIn = $("checkin-text").value.trim();
   $("checkin").hidden = true;
-  state.busy = true;
+  state.drafting = true;
   $("generate").disabled = true;
   $("empty").hidden = true;
   $("draft").hidden = true;
@@ -422,7 +422,7 @@ async function generate() {
     steps.append(h("li", { class: "msg-error" }, err.message));
     toast(err.message);
   } finally {
-    state.busy = false;
+    state.drafting = false;
     $("generate").disabled = false;
   }
 }
@@ -440,8 +440,8 @@ function addMessage(role, text, extraClass = "") {
 }
 
 async function send(message) {
-  if (!message.trim() || state.busy) return;
-  state.busy = true;
+  if (!message.trim() || state.chatting) return;
+  state.chatting = true;
   $("chat-send").disabled = true;
   const history = state.chat.slice(-20);
   addMessage("user", message);
@@ -465,7 +465,7 @@ async function send(message) {
     progress.remove();
     addMessage("agent", err.message, "msg-error");
   } finally {
-    state.busy = false;
+    state.chatting = false;
     $("chat-send").disabled = false;
   }
 }
