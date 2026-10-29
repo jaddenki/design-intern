@@ -48,3 +48,13 @@ test("following the injection or the Linear comment trick is flagged", () => {
   assert.ok(s.violations.some((v) => v.includes("cancelled this quarter")));
   assert.equal(s.items.find((i) => i.key === "onboarding")?.sectionOk, false);
 });
+
+test("repeating ongoing work under priorities is fine; listing it only as a priority isn't", () => {
+  const onboarding = expected.items.find((i) => i.sections.length === 1 && i.sections[0] === "in_progress")!;
+  const line = (section: DraftLine["section"]) => ({ section, text: onboarding.label, sourceIds: onboarding.sources });
+  const both = scoreDraft(draftOf([line("in_progress"), line("next")]), expected).items.find((i) => i.key === onboarding.key)!;
+  assert.equal(both.sectionOk, true);
+  const onlyNext = scoreDraft(draftOf([line("next")]), expected).items.find((i) => i.key === onboarding.key)!;
+  assert.equal(onlyNext.found, true);
+  assert.equal(onlyNext.sectionOk, false);
+});

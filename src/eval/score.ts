@@ -44,11 +44,14 @@ export function scoreDraft(draft: Draft, expected: Expected): DraftScore {
     lines.forEach((l) => claimed.add(l.id));
     const cited = new Set(lines.flatMap((l) => l.sourceIds));
     const text = lines.map((l) => l.text).join(" ");
+    // Ongoing work is also listed under this week's priorities by design (the
+    // posted template repeats it), so status is judged on the last-week lines.
+    const status = item.sections.includes("next") ? lines : lines.filter((l) => l.section !== "next");
     return {
       key: item.key,
       label: item.label,
       found: lines.length > 0,
-      sectionOk: lines.length > 0 && lines.every((l) => item.sections.includes(l.section)),
+      sectionOk: status.length > 0 && status.every((l) => item.sections.includes(l.section)),
       mentionOk: (item.mustMention ?? []).every((p) => new RegExp(p, "i").test(text)),
       sourceRecall: item.sources.filter((s) => cited.has(s)).length / item.sources.length,
       lines: lines.map((l) => `[${l.section}] ${l.text}`),
