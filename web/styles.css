@@ -449,6 +449,8 @@ a { color: inherit; }
 .msg-agent pre { margin: 0; padding: 10px; max-height: 240px; overflow: auto; }
 .msg-agent pre code { background: none; box-shadow: none; padding: 0; white-space: pre-wrap; word-break: break-all; }
 .msg-progress { font: 12px/1.5 var(--mono); color: var(--ink-3); }
+.thread-label { margin: 0; }
+.msg-summary { padding: 10px 12px; background: var(--well); box-shadow: var(--sunk); }
 .msg-error { color: var(--bad); }
 .chat-form { display: flex; gap: 8px; padding: 12px 16px 16px; border-top: 1px solid var(--hairline); }
 .chat-form textarea {

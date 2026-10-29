@@ -9,7 +9,9 @@ const SECTIONS = [
 const KIND_LABEL = { linear: "Linear", github: "GitHub", slack: "Slack", figma: "Figma", doc: "Doc", note: "Check-in" };
 
 const $ = (id) => document.getElementById(id);
-const state = { drafts: [], current: null, chat: [], drafting: false, chatting: false };
+// Chat threads: one per draft (keyed by its id) plus "general" for everything else.
+const GENERAL = "general";
+const state = { drafts: [], current: null, threads: {}, pending: new Map(), drafting: false, chatting: false };
 
 function h(tag, attrs = {}, ...children) {
   const el = document.createElement(tag);
@@ -234,6 +236,7 @@ function renderDraft() {
   $("draft").hidden = !d;
   $("context-toggle").hidden = !d;
   renderRail();
+  renderChat();
   if (!d) return;
   $("context-label").textContent = `About ${fmtDay(d.window.since)}–${fmtDay(d.window.until)} draft`;
   const editable = d.status === "pending";
@@ -271,8 +274,8 @@ function renderDraft() {
       d.notes.length
         ? h("aside", { class: "notes" }, h("div", { class: "label" }, "For you to check"), h("ul", {}, d.notes.map((n) => h("li", {}, n))))
         : null,
-      ...sections,
       renderMessage(d, editable),
+      ...sections,
       h(
         "details",
         { class: "history" },
@@ -415,7 +418,8 @@ async function generate() {
         $("checkin-text").value = "";
         await refresh();
         await openDraft(ev.draftId);
-        addMessage("agent", ev.text);
+        addMessage("agent", `*Draft ready.* ${ev.text}`, "msg-summary", ev.draftId);
+        renderChat();
       }
     });
   } catch (err) {
@@ -428,33 +432,61 @@ async function generate() {
 }
 
 /* Chat */
-function addMessage(role, text, extraClass = "") {
-  $("suggestions").hidden = true;
-  const el = h("div", { class: `msg msg-${role} ${extraClass}` });
+const threadKey = () => (state.current && $("context-on").checked ? state.current.id : GENERAL);
+const thread = (key) => (state.threads[key] ??= []);
+
+function messageEl({ role, text, cls }) {
+  const el = h("div", { class: `msg msg-${role} ${cls ?? ""}` });
   if (role === "agent") el.innerHTML = mrkdwn(text);
   else el.textContent = text;
+  return el;
+}
+
+/* Shows only the visible thread: the open draft's (when "About … draft" is on) or General. */
+function renderChat() {
+  const key = threadKey();
+  const log = $("chat-log");
+  const name = key === GENERAL ? "General" : `${fmtDay(state.current.window.since)}–${fmtDay(state.current.window.until)} draft`;
+  log.querySelectorAll(".msg, .thread-label").forEach((el) => el.remove());
+  log.prepend(h("div", { class: "thread-label label" }, `Thread · ${name}`));
+  for (const m of thread(key)) log.append(messageEl(m));
+  const pending = state.pending.get(key);
+  if (pending) log.append(pending);
+  $("suggestions").hidden = thread(key).length > 0 || Boolean(pending);
+  log.lastElementChild?.scrollIntoView({ block: "end" });
+}
+
+function addMessage(role, text, cls = "", key = threadKey()) {
+  thread(key).push({ role, text, cls });
+  if (key !== threadKey()) return;
+  $("suggestions").hidden = true;
+  const el = messageEl({ role, text, cls });
   $("chat-log").append(el);
   el.scrollIntoView({ block: "end", behavior: "smooth" });
-  if (role !== "progress") state.chat.push({ role, text });
-  return el;
 }
 
 async function send(message) {
   if (!message.trim() || state.chatting) return;
   state.chatting = true;
   $("chat-send").disabled = true;
-  const history = state.chat.slice(-20);
-  addMessage("user", message);
+  const key = threadKey();
+  const draftId = key === GENERAL ? undefined : key;
+  const history = thread(key)
+    .filter((m) => m.role !== "progress" && !m.cls?.includes("msg-error"))
+    .slice(-20)
+    .map(({ role, text }) => ({ role, text }));
+  addMessage("user", message, "", key);
   const progress = h("div", { class: "msg msg-progress" }, "Thinking…");
-  $("chat-log").append(progress);
-  const draftId = state.current && $("context-on").checked ? state.current.id : undefined;
+  state.pending.set(key, progress);
+  if (key === threadKey()) $("chat-log").append(progress);
   try {
     await streamApi("/api/chat", { message, draftId, history }, async (ev) => {
       if (ev.type === "progress") progress.textContent = stripEmoji(ev.text);
       if (ev.type === "error") throw new Error(ev.text);
       if (ev.type === "result") {
+        state.pending.delete(key);
         progress.remove();
-        addMessage("agent", ev.text);
+        addMessage("agent", ev.text, "", key);
         if (ev.draftChanged && draftId) {
           await openDraft(draftId);
           toast("Draft revised.");
@@ -462,8 +494,9 @@ async function send(message) {
       }
     });
   } catch (err) {
+    state.pending.delete(key);
     progress.remove();
-    addMessage("agent", err.message, "msg-error");
+    addMessage("agent", err.message, "msg-error", key);
   } finally {
     state.chatting = false;
     $("chat-send").disabled = false;
@@ -481,6 +514,7 @@ async function refresh() {
 }
 
 $("generate").addEventListener("click", openCheckIn);
+$("context-on").addEventListener("change", renderChat);
 $("chat-log").addEventListener("click", async (e) => {
   const btn = e.target.closest(".copy");
   if (!btn) return;
@@ -524,3 +558,4 @@ $("suggestions").addEventListener("click", (e) => {
 const s = await refresh();
 const initial = location.hash.slice(1) || s.drafts.find((d) => d.status === "pending")?.id;
 if (initial) await openDraft(initial);
+else renderChat();
