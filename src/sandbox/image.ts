@@ -37,7 +37,8 @@ export function pinnedDependencies(root = APP_ROOT): string[] {
 export function sandboxImage(modal: ModalClient): Image {
   return modal.images.fromRegistry(NODE_IMAGE).dockerfileCommands([
     "RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*",
-    `RUN npm install -g @infisical/cli@${INFISICAL_CLI_VERSION} && npm cache clean --force`,
+    // The CLI's preinstall downloads the binary; newer npm skips scripts unless allowed.
+    `RUN npm install -g --allow-scripts=@infisical/cli @infisical/cli@${INFISICAL_CLI_VERSION} && npm cache clean --force && infisical --version`,
     `RUN useradd --create-home --uid 2000 --shell /bin/bash ${SANDBOX_USER}`,
     `RUN mkdir -p ${APP_DIR} && cd ${APP_DIR} && echo '{"private":true,"type":"module"}' > package.json && ` +
       `npm install --omit=dev --no-audit --no-fund ${pinnedDependencies().join(" ")} && npm cache clean --force && ` +
