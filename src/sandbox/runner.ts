@@ -156,7 +156,7 @@ export async function runInSandbox(
   onProgress?: (message: string) => void,
 ): Promise<string> {
   const cfg = modalConfig();
-  onProgress?.(":package: Preparing the sandbox image (a few minutes after a dependency change)…");
+  onProgress?.(":package: Checking the sandbox image…");
   const { client, app, image, proxySecret, vault } = await connect(cfg);
   onProgress?.(":lock: Starting a sandbox and an Agent Vault session…");
   const job: Job = {
