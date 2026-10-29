@@ -1,0 +1,12 @@
+{
+  "figma": {
+    "description": "Figma design files via Framelink's figma-developer-mcp (third-party server). get_figma_data returns a file's name, pages, frames, and components so you can see what design work exists and how it's named.",
+    "command": "node",
+    "args": ["node_modules/figma-developer-mcp/dist/bin.js", "--stdio"],
+    "env": { "FIGMA_API_KEY": "${FIGMA_API_KEY}" },
+    "requiredEnv": ["FIGMA_API_KEY"],
+    "allowedTools": ["get_figma_data"],
+    "scope": { "argument": "fileKey", "allowEnv": "FIGMA_FILE_KEYS", "expand": "figma-projects" },
+    "source": { "kind": "figma", "idArgument": "fileKey", "url": "https://www.figma.com/design/{id}" }
+  }
+}

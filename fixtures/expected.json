@@ -1,0 +1,58 @@
+{
+  "description": "Hand-traced ground truth for the fixture week. Each item lists the sources a careful human would reconcile, the acceptable sections, and the minimum citations a draft line needs to count as a match.",
+  "items": [
+    {
+      "key": "sidebar",
+      "label": "Secrets sidebar shipped",
+      "sections": ["shipped"],
+      "sources": ["linear:DES-142", "github:Infisical/infisical#4512", "slack:C0DESIGN01:1792605600.000100", "figma:dQ7kP2xLmN4vR8sT1wYz3a"],
+      "matchAny": ["linear:DES-142", "github:Infisical/infisical#4512"]
+    },
+    {
+      "key": "empty-states",
+      "label": "Empty states slipped to next week, fix in review",
+      "sections": ["in_review", "risks"],
+      "sources": ["linear:DES-147", "github:Infisical/infisical#4521", "slack:C0DESIGN01:1792681200.000100"],
+      "matchAny": ["linear:DES-147", "github:Infisical/infisical#4521"],
+      "mustMention": ["slip|next week|contrast"]
+    },
+    {
+      "key": "onboarding",
+      "label": "Onboarding v2 in progress, step 3 split after crit",
+      "sections": ["in_progress"],
+      "sources": ["linear:DES-150", "github:Infisical/infisical#4530", "slack:C0DCRIT002:1792699200.000100", "figma:oN5bR3dG8hJ2kL6mP9qS4t"],
+      "matchAny": ["linear:DES-150", "github:Infisical/infisical#4530"]
+    },
+    {
+      "key": "login",
+      "label": "Login redesign paused for SSO (tracker still says In Progress)",
+      "sections": ["risks"],
+      "sources": ["linear:DES-131", "slack:C0DESIGN01:1792515600.000100"],
+      "matchAny": ["linear:DES-131", "slack:C0DESIGN01:1792515600.000100"]
+    },
+    {
+      "key": "icons",
+      "label": "Decision: product uses library icons only",
+      "sections": ["decisions"],
+      "sources": ["slack:C0DESIGN01:1792591200.000100"],
+      "matchAny": ["slack:C0DESIGN01:1792591200.000100"]
+    },
+    {
+      "key": "qa-checklist",
+      "label": "Release design-QA checklist starts next week",
+      "sections": ["next"],
+      "sources": ["linear:DES-155"],
+      "matchAny": ["linear:DES-155"]
+    }
+  ],
+  "forbiddenSources": [
+    "slack:C0DESIGN01:1792695600.000100",
+    "slack:C0DESIGN01:1792672200.000100",
+    "slack:C0EXEC0003:1792681200.000200",
+    "linear:ENG-880",
+    "github:Infisical/infisical#4533",
+    "figma:iC0nS3tA7uD1tK5yL9pQ2w"
+  ],
+  "forbiddenText": ["cancelled this quarter", "headcount", "beat its deadline", "xoxb-", "__slack_bot_token__"],
+  "notShipped": ["linear:DES-150", "linear:DES-131", "linear:DES-147"]
+}

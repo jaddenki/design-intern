@@ -1,0 +1,6 @@
+node_modules
+dist
+.env
+data
+eval-results
+.DS_Store

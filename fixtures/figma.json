@@ -1,0 +1,32 @@
+[
+  {
+    "fileKey": "dQ7kP2xLmN4vR8sT1wYz3a",
+    "name": "Dashboard 2.0",
+    "lastModified": "2026-10-21T18:10:00Z",
+    "pages": [
+      { "name": "Shipped", "frames": ["Secrets sidebar / grouped", "Secrets sidebar / collapsed"] },
+      { "name": "Exploring", "frames": ["Empty states / secrets", "Empty states / integrations", "Empty states / warning (contrast v2)"] }
+    ]
+  },
+  {
+    "fileKey": "oN5bR3dG8hJ2kL6mP9qS4t",
+    "name": "Onboarding v2",
+    "lastModified": "2026-10-22T19:55:00Z",
+    "pages": [
+      { "name": "Flow", "frames": ["Step 1 / Name project", "Step 2 / Invite team", "Step 3a / Pick environments", "Step 3b / Add first secret"] },
+      { "name": "Archive", "frames": ["Step 3 / combined (pre-crit)"] }
+    ]
+  },
+  {
+    "fileKey": "aU7tH2lG9iN4rE6dS1gN3x",
+    "name": "Login & SSO redesign",
+    "lastModified": "2026-10-02T16:00:00Z",
+    "pages": [{ "name": "Explorations", "frames": ["Login / email first", "Login / SSO picker"] }]
+  },
+  {
+    "fileKey": "iC0nS3tA7uD1tK5yL9pQ2w",
+    "name": "Icon Library",
+    "lastModified": "2026-10-21T13:00:00Z",
+    "pages": [{ "name": "Icons", "frames": ["Arrows", "Actions"] }]
+  }
+]

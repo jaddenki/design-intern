@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Design Intern Inbox</title>
+    <link rel="icon" href="/avatar.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="rail" aria-label="Drafts">
+        <header class="brand">
+          <span class="avatar"><img src="/avatar.png" alt="" /></span>
+          <div>
+            <div class="brand-name" id="agent-name">Design Intern</div>
+            <div class="brand-sub">Infisical design team</div>
+          </div>
+        </header>
+        <button class="btn btn-primary btn-block" id="generate">Draft this week’s update</button>
+        <div class="label">Drafts</div>
+        <ul class="draft-list" id="draft-list"></ul>
+        <footer class="rail-foot" id="whoami"></footer>
+      </aside>
+
+      <main class="stage" id="stage" tabindex="-1">
+        <section id="empty" class="empty">
+          <span class="avatar"><img src="/avatar.png" alt="" /></span>
+          <p class="empty-title">No draft selected</p>
+          <p class="empty-copy">Draft this week’s update to review it here. Nothing posts to Slack until you approve it.</p>
+        </section>
+        <section id="progress" class="progress" hidden aria-live="polite">
+          <div class="label">Drafting</div>
+          <ol class="progress-steps" id="progress-steps"></ol>
+        </section>
+        <article id="draft" class="draft" hidden></article>
+      </main>
+
+      <aside class="chat" aria-label="Chat with Design Intern">
+        <header class="chat-head">
+          <span class="chat-title"><span class="avatar avatar-sm"><img src="/avatar.png" alt="" /></span>Ask Design Intern</span>
+          <label class="context-toggle" id="context-toggle" hidden>
+            <input type="checkbox" id="context-on" checked />
+            <span id="context-label">About this draft</span>
+          </label>
+        </header>
+        <div class="chat-log" id="chat-log" aria-live="polite">
+          <div class="suggestions" id="suggestions">
+            <button class="chip-btn" data-q="Why is the login redesign listed as a risk?">Why is the login redesign a risk?</button>
+            <button class="chip-btn" data-q="What did you leave out of this draft, and why?">What did you leave out?</button>
+            <button class="chip-btn" data-q="What are our brand colors?">What are our brand colors?</button>
+          </div>
+        </div>
+        <form class="chat-form" id="chat-form">
+          <textarea id="chat-input" rows="1" placeholder="Ask why, request a change, or ask a design question" aria-label="Message"></textarea>
+          <button class="btn btn-primary" type="submit" id="chat-send">Send</button>
+        </form>
+      </aside>
+    </div>
+    <div class="toast" id="toast" role="status" hidden></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

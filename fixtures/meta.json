@@ -1,0 +1,11 @@
+{
+  "description": "Fictional design-team week for demo mode and the eval. All people, issues, PRs, messages, and Figma files are invented.",
+  "now": "2026-10-23T17:00:00Z",
+  "env": {
+    "LINEAR_TEAM_KEYS": "DES",
+    "GITHUB_REPOS": "Infisical/infisical",
+    "DESIGN_GITHUB_LOGINS": "leotanaka-dev,maya-okafor",
+    "DESIGN_SLACK_CHANNELS": "C0DESIGN01,C0DCRIT002",
+    "FIGMA_FILE_KEYS": "dQ7kP2xLmN4vR8sT1wYz3a,oN5bR3dG8hJ2kL6mP9qS4t,aU7tH2lG9iN4rE6dS1gN3x"
+  }
+}

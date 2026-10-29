@@ -1,20 +1,27 @@
 {
-  "name": "agent-template",
+  "name": "design-intern",
   "version": "0.1.0",
-  "description": "Boilerplate for building Claude Agent SDK agents that run behind Infisical's agent-vault proxy",
+  "description": "Design Intern: drafts approval-gated weekly updates from Linear, Slack, GitHub, and Figma behind Infisical Agent Vault",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
     "start": "tsx src/index.ts",
     "start:slack": "tsx --watch src/slack.ts",
+    "web": "tsx src/web-main.ts",
+    "draft": "tsx src/index.ts draft",
+    "eval": "tsx src/eval/run-eval.ts",
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "DATA_SOURCE= node --import tsx --test $(find src -name \"*.test.ts\")"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.101",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.310",
     "@slack/bolt": "^4.7.0",
+    "@slack/web-api": "^7.19.0",
     "dotenv": "^17.4.1",
+    "figma-developer-mcp": "0.13.2",
     "https-proxy-agent": "^9.0.0",
+    "modal": "0.11.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
