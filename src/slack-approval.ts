@@ -11,6 +11,10 @@ const SECTION_TEXT_LIMIT = 2_900;
 
 export const APPROVE_ACTION = "approve_draft";
 export const REJECT_ACTION = "reject_draft";
+export const EDIT_ACTION = "edit_message";
+export const EDIT_VIEW = "edit_message_view";
+/** Slack's limit for a plain_text_input; longer messages are edited in the inbox. */
+export const EDIT_MAX_CHARS = 3_000;
 
 const approvalChannel = () => process.env.DESIGN_APPROVAL_CHANNEL?.trim();
 const updateChannel = () => process.env.DESIGN_UPDATE_CHANNEL?.trim();
@@ -43,13 +47,19 @@ export function previewBlocks(draft: Draft): KnownBlock[] {
       type: "actions",
       elements: [
         { type: "button", style: "primary", action_id: APPROVE_ACTION, value: draft.id, text: { type: "plain_text", text: "Approve & post" } },
+        { type: "button", action_id: EDIT_ACTION, value: draft.id, text: { type: "plain_text", text: "Edit message" } },
         { type: "button", style: "danger", action_id: REJECT_ACTION, value: draft.id, text: { type: "plain_text", text: "Reject" } },
         ...(url ? [{ type: "button" as const, action_id: "open_inbox", url, text: { type: "plain_text" as const, text: "Open in inbox" } }] : []),
       ],
     });
     blocks.push({
       type: "context",
-      elements: [{ type: "mrkdwn", text: "Reply in this thread and @mention me to ask why something's in or out, or to request changes." }],
+      elements: [
+        {
+          type: "mrkdwn",
+          text: "*Edit message* to change the wording yourself, or reply in this thread and @mention me to ask why something's in or out or to request changes.",
+        },
+      ],
     });
   } else {
     const last = [...draft.history].reverse().find((e) => e.action === "approved" || e.action === "rejected");

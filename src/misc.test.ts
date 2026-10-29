@@ -83,6 +83,13 @@ test("slack: long replies split under the limit with code fences kept balanced",
   assert.deepEqual(splitForSlack("short"), ["short"]);
 });
 
+test("slack: only what's said beyond the draft request becomes the check-in", async () => {
+  const { checkInFrom } = await import("./slack-draft-request.js");
+  assert.equal(checkInFrom("draft this week's design update"), undefined);
+  assert.equal(checkInFrom("can u draft this week's design update?"), undefined);
+  assert.equal(checkInFrom("can u draft this week's design update? btw i also worked on series B video"), "btw i also worked on series B video");
+});
+
 test("figma: project files merge with single file keys, project metadata wins", () => {
   const files = mergeFiles(["a", "b"], [{ key: "b", name: "Onboarding", lastModified: "2026-10-22T00:00:00Z", project: "Design" }, { key: "c", name: "Icons", lastModified: null, project: "Design" }]);
   assert.deepEqual(files.map((f) => f.key).sort(), ["a", "b", "c"]);

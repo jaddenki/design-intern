@@ -2,14 +2,14 @@ import "./bootstrap.js";
 import { App } from "@slack/bolt";
 import { allowlistConfigured, DESIGN_TEAM_ONLY_MESSAGE, isAllowedEmail } from "./access.js";
 import { AGENT_NAME } from "./config.js";
-import { approveDraft, generateDraft, rejectDraft } from "./drafts/actions.js";
+import { approveDraft, editMessage, generateDraft, rejectDraft } from "./drafts/actions.js";
 import { finalMessage } from "./drafts/render.js";
-import { findDraftByPreview } from "./drafts/store.js";
-import { DRAFT_REQUEST } from "./slack-draft-request.js";
+import { findDraftByPreview, getDraft } from "./drafts/store.js";
+import { checkInFrom, DRAFT_REQUEST } from "./slack-draft-request.js";
 import { splitForSlack } from "./slack-chunks.js";
 import { runAgent } from "./run-agent.js";
 import { startWeeklyFromEnv } from "./schedule.js";
-import { APPROVE_ACTION, REJECT_ACTION } from "./slack-approval.js";
+import { APPROVE_ACTION, EDIT_ACTION, EDIT_MAX_CHARS, EDIT_VIEW, REJECT_ACTION } from "./slack-approval.js";
 import { slackAgent } from "./slack-client.js";
 import { startWebServer } from "./web/server.js";
 
@@ -120,8 +120,8 @@ async function handleMessage(
 
   try {
     if (!draft && DRAFT_REQUEST.test(userMessage)) {
-      // The whole message doubles as the check-in ("btw I also worked on…").
-      const { draft: created, summary } = await generateDraft(actor, onProgress, userMessage);
+      // Anything said beyond the request is the check-in ("btw I also worked on…").
+      const { draft: created, summary } = await generateDraft(actor, onProgress, checkInFrom(userMessage));
       const where = created.preview
         ? `Waiting for approval in <#${created.preview.channel}>. Nothing posts until someone approves it.`
         : "Nothing posts until someone approves it in the inbox.";
@@ -213,6 +213,58 @@ app.action(APPROVE_ACTION, async ({ ack, body, client }) => {
 app.action(REJECT_ACTION, async ({ ack, body, client }) => {
   await ack();
   await decide("reject", body as Parameters<typeof decide>[1], client);
+});
+
+// Hand-editing the Slack message, like the inbox's editor: a modal with the exact text.
+app.action(EDIT_ACTION, async ({ ack, body, client }) => {
+  await ack();
+  const action = body as { user: { id: string }; channel?: { id: string }; trigger_id: string; actions: { value?: string }[] };
+  const draftId = action.actions[0]?.value ?? "";
+  const tell = (text: string) =>
+    action.channel ? client.chat.postEphemeral({ channel: action.channel.id, user: action.user.id, text }).catch(() => {}) : undefined;
+  if (!isAllowedEmail(await emailFor(client, action.user.id))) return void (await tell(DESIGN_TEAM_ONLY_MESSAGE));
+  const draft = getDraft(draftId);
+  if (!draft || draft.status !== "pending") return void (await tell("That draft isn't pending anymore."));
+  const text = finalMessage(draft);
+  if (text.length > EDIT_MAX_CHARS) {
+    return void (await tell(`This message is over Slack's ${EDIT_MAX_CHARS.toLocaleString()}-character edit limit; edit it in the inbox instead.`));
+  }
+  await client.views.open({
+    trigger_id: action.trigger_id,
+    view: {
+      type: "modal",
+      callback_id: EDIT_VIEW,
+      private_metadata: draftId,
+      title: { type: "plain_text", text: "Edit update message" },
+      submit: { type: "plain_text", text: "Save" },
+      close: { type: "plain_text", text: "Cancel" },
+      blocks: [
+        {
+          type: "input",
+          block_id: "message",
+          label: { type: "plain_text", text: "This is exactly what posts when it's approved" },
+          element: { type: "plain_text_input", action_id: "text", multiline: true, initial_value: text, max_length: EDIT_MAX_CHARS },
+        },
+        {
+          type: "context",
+          elements: [{ type: "mrkdwn", text: "Slack formatting works: *bold*, _italic_, • bullets, :emoji:. To go back to the generated message, use Reset in the inbox." }],
+        },
+      ],
+    },
+  });
+});
+
+app.view(EDIT_VIEW, async ({ ack, body, view, client }) => {
+  const draftId = view.private_metadata;
+  const text = view.state.values.message?.text?.value ?? "";
+  const email = await emailFor(client, body.user.id);
+  if (!isAllowedEmail(email)) return void (await ack({ response_action: "errors", errors: { message: DESIGN_TEAM_ONLY_MESSAGE } }));
+  try {
+    await editMessage(draftId, `slack:${email}`, text);
+    await ack();
+  } catch (err) {
+    await ack({ response_action: "errors", errors: { message: err instanceof Error ? err.message : "Couldn't save the message." } });
+  }
 });
 
 // URL buttons still send an action that must be acked.
