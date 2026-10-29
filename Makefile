@@ -6,7 +6,8 @@ SECRETS_ENV ?= dev
 SECRETS_PATH ?= /
 INBOX_PASSWORD ?= demo
 
-RUN = npm run build >/dev/null && infisical run --env=$(SECRETS_ENV) --path=$(SECRETS_PATH) -- env AGENT_RUNNER=modal
+# --recursive reads every folder under SECRETS_PATH (host/, agent/, scope/, config/).
+RUN = npm run build >/dev/null && infisical run --env=$(SECRETS_ENV) --path=$(SECRETS_PATH) --recursive -- env AGENT_RUNNER=modal
 
 help:
 	@echo "make web            inbox at localhost:3000 (any name, password: $(INBOX_PASSWORD))"
@@ -45,7 +46,7 @@ test:
 	npm test
 
 sandboxes: check-init
-	@infisical run --env=$(SECRETS_ENV) --path=$(SECRETS_PATH) --silent -- npx tsx scripts/sandboxes.ts
+	@infisical run --env=$(SECRETS_ENV) --path=$(SECRETS_PATH) --recursive --silent -- npx tsx scripts/sandboxes.ts
 
 runs:
 	@npx tsx scripts/runs.ts $(N)
@@ -53,19 +54,22 @@ runs:
 sync-brand:
 	npx tsx scripts/sync-brand.ts
 
-# Agent credentials are placeholders only: the real values live in the Agent Vault bundle.
+# Folders by sensitivity: host/ holds the only real credentials; agent/ holds placeholders
+# (real values live in the Agent Vault bundle); scope/ and config/ hold plain settings.
 bootstrap-secrets: check-init
-	infisical secrets set --env=$(SECRETS_ENV) --path=$(SECRETS_PATH) \
+	-@for f in host agent scope config; do infisical secrets folders create --env=$(SECRETS_ENV) --path=/ --name=$$f >/dev/null 2>&1; done
+	infisical secrets set --env=$(SECRETS_ENV) --path=/agent \
 	  LINEAR_API_KEY=__linear_api_key__ \
 	  GITHUB_TOKEN=__github_token__ \
-	  FIGMA_API_KEY=__figma_api_key__ \
+	  FIGMA_API_KEY=__figma_api_key__
+	infisical secrets set --env=$(SECRETS_ENV) --path=/config \
 	  AGENT_VAULT_ACCESS_BUNDLE=design-intern \
 	  AGENT_VAULT_PROXY_SECRET=design-intern-proxy \
 	  DESIGN_ALLOWLIST=jadden@infisical.com
 	@echo ""
-	@echo "Now set these in the Infisical dashboard ($(SECRETS_ENV), $(SECRETS_PATH)):"
-	@echo "  Host:   MODAL_TOKEN_ID, MODAL_TOKEN_SECRET, INFISICAL_UNIVERSAL_AUTH_CLIENT_ID,"
-	@echo "          INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET, AGENT_VAULT_CA_FINGERPRINT"
-	@echo "  Scope:  LINEAR_ASSIGNEE_EMAILS and/or LINEAR_TEAM_KEYS, GITHUB_REPOS + DESIGN_GITHUB_LOGINS,"
-	@echo "          FIGMA_PROJECT_IDS, DESIGN_SLACK_CHANNELS"
-	@echo "Slack bot: real SLACK_BOT_TOKEN and SLACK_APP_TOKEN (host credentials)."
+	@echo "Now set these in the Infisical dashboard ($(SECRETS_ENV)):"
+	@echo "  /host:   MODAL_TOKEN_ID, MODAL_TOKEN_SECRET, INFISICAL_UNIVERSAL_AUTH_CLIENT_ID,"
+	@echo "           INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET, SLACK_BOT_TOKEN, SLACK_APP_TOKEN"
+	@echo "  /config: AGENT_VAULT_CA_FINGERPRINT, DESIGN_APPROVAL_CHANNEL, DESIGN_UPDATE_CHANNEL"
+	@echo "  /scope:  LINEAR_ASSIGNEE_EMAILS and/or LINEAR_TEAM_KEYS, GITHUB_REPOS + DESIGN_GITHUB_LOGINS,"
+	@echo "           FIGMA_PROJECT_IDS, DESIGN_SLACK_CHANNELS"

@@ -64,6 +64,15 @@ make test           # unit tests, no Infisical or Modal needed
 
 The first run builds the sandbox image, which takes a few minutes; Modal caches it after that.
 
+Secrets Manager layout (the Makefile reads all folders with `--recursive`; keep each key in one folder only):
+
+| Folder | What | Who should see it |
+|---|---|---|
+| `/host` | The only real credentials: Modal token, machine identity, Slack bot and app tokens | You and the deploy identity |
+| `/agent` | Placeholders like `__linear_api_key__`; real values live in the Agent Vault bundle | Anyone on the project |
+| `/scope` | Who and what the agent reads: Linear assignees and teams, GitHub repos and logins, Slack channels, Figma projects | Teammates who manage scope |
+| `/config` | Bundle and proxy-secret names, CA fingerprint, allowlist, channels, schedule, models | Teammates who manage scope |
+
 Run `make sync-brand` once (and whenever the brand changes) so brand questions have something to answer from. It pulls infisical.com/design.md, the brand CSS tokens, the logos, and the private brand repo's tokens via your `gh` login into the gitignored `knowledge/brand/`.
 
 ### Deploying
