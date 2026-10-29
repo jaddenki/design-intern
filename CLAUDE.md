@@ -25,7 +25,7 @@ Each one imports `./bootstrap.js` first (the eval's fixture scope when `DATA_SOU
 ```
 src/
 ├── linear/ github/ slack-source/   client.ts (scope + fetch + fixtures) and tools/
-├── knowledge/                       design reference docs from DESIGN_KNOWLEDGE_DIR
+├── knowledge/                       design reference docs from DESIGN_KNOWLEDGE_DIR (brand/ via scripts/sync-brand.ts, gitignored)
 ├── drafts/                          types, store (JSON files), validate, render, actions, tools/
 ├── external-mcp.ts                  mcp-servers.json loader + scope/source hooks
 ├── figma/fixture-server.ts          eval stand-in with the same tool name as Framelink

@@ -65,9 +65,32 @@ const fmtDay = (iso) => new Date(iso).toLocaleDateString("en-US", { month: "shor
 const fmtTime = (iso) => new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const stripEmoji = (s) => s.replace(/:[a-z_]+:\s*/g, "");
 
+const escapeHtml = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/* A fenced block with a Copy button. SVG previews render through <img>, which never runs scripts. */
+function codeBlock(lang, code) {
+  const isSvg = lang === "svg" || /^\s*(<\?xml[^>]*>\s*)?<svg[\s>]/i.test(code);
+  const onDark = isSvg && /fill="(#fff(fff)?|white)"/i.test(code);
+  const preview = isSvg
+    ? `<div class="code-preview${onDark ? " on-dark" : ""}"><img alt="SVG preview" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(code)}"></div>`
+    : "";
+  return `<div class="code">${preview}<div class="code-bar"><span>${escapeHtml(lang || (isSvg ? "svg" : "code"))}</span><button class="copy" type="button">Copy</button></div><pre><code>${escapeHtml(code)}</code></pre></div>`;
+}
+
 /* Slack mrkdwn → safe HTML. Escape first, then add a small allowlisted set of tags. */
 function mrkdwn(src) {
-  const esc = src.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return src
+    .split(/```([a-z]*)\n?([\s\S]*?)```/)
+    .map((part, i, parts) => {
+      if (i % 3 === 1) return "";
+      if (i % 3 === 2) return codeBlock(parts[i - 1], part.replace(/\n$/, ""));
+      return prose(part);
+    })
+    .join("");
+}
+
+function prose(src) {
+  const esc = escapeHtml(src);
   const inline = (s) =>
     s
       .replace(/&lt;(https?:\/\/[^|\s]+?)\|(.+?)&gt;/g, (_, u, l) => `<a href="${u.replace(/"/g, "%22")}" target="_blank" rel="noopener">${l}</a>`)
@@ -412,6 +435,17 @@ async function refresh() {
 }
 
 $("generate").addEventListener("click", openCheckIn);
+$("chat-log").addEventListener("click", async (e) => {
+  const btn = e.target.closest(".copy");
+  if (!btn) return;
+  try {
+    await navigator.clipboard.writeText(btn.closest(".code").querySelector("code").textContent);
+    btn.textContent = "Copied";
+    setTimeout(() => (btn.textContent = "Copy"), 1500);
+  } catch {
+    toast("Couldn't copy; select the code instead.");
+  }
+});
 $("checkin-go").addEventListener("click", generate);
 $("checkin-cancel").addEventListener("click", closeCheckIn);
 $("checkin-text").addEventListener("keydown", (e) => {

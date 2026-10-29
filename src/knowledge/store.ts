@@ -59,7 +59,7 @@ const terms = (q: string) =>
     .split(/[^a-z0-9#]+/)
     .filter((t) => t.length > 2);
 
-/** Rank docs by term hits (title hits count triple). Pure apart from the read. */
+/** Rank docs by term hits, capped per term (title hits count triple). Pure apart from the read. */
 export function searchDocs(query: string, root = KNOWLEDGE_DIR): { doc: KnowledgeDoc; score: number; snippet: string }[] {
   const qs = terms(query);
   if (qs.length === 0) return [];
@@ -72,7 +72,8 @@ export function searchDocs(query: string, root = KNOWLEDGE_DIR): { doc: Knowledg
       for (const t of qs) {
         const idx = body.indexOf(t);
         if (idx >= 0) {
-          score += body.split(t).length - 1;
+          // Capped so a long token dump can't outrank the doc that's about the topic.
+          score += Math.min(body.split(t).length - 1, 3);
           if (first < 0 || idx < first) first = idx;
         }
         if (title.includes(t)) score += 3;

@@ -10,7 +10,7 @@ In Slack (@mention or DM) or in the web inbox's chat pane:
 
 - "Draft this week's design update." → drafts, saves as pending, sends an approval preview. In the inbox it first asks what you worked on; that check-in becomes a source the draft can cite (`make draft NOTE='…'` from the CLI).
 - In the preview's thread: "Why is the login redesign a risk?" / "Drop the icon line." → explains or revises the pending draft
-- "Where's the component library?" → answers from `knowledge/`, or says it isn't documented
+- "What's our primary color?" / "Give me the white logo as SVG" → answers from the brand docs in `knowledge/` (filled by `make sync-brand`), with a copyable, previewed SVG. Anything undocumented, it says so.
 
 ## Architecture
 
@@ -63,6 +63,8 @@ make test           # unit tests, no Infisical or Modal needed
 4. **Secrets Manager:** `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET`, `INFISICAL_UNIVERSAL_AUTH_CLIENT_ID`, `INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET`, `AGENT_VAULT_CA_FINGERPRINT` (the proxy's row on the Proxies page), the scope settings below, and, for the Slack bot, the real `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN`.
 
 The first run builds the sandbox image, which takes a few minutes; Modal caches it after that.
+
+Run `make sync-brand` once (and whenever the brand changes) so brand questions have something to answer from. It pulls infisical.com/design.md, the brand CSS tokens, the logos, and the private brand repo's tokens via your `gh` login into the gitignored `knowledge/brand/`.
 
 ### Deploying
 
