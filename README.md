@@ -87,7 +87,7 @@ Each source fails closed when its scope is empty, and the model can't pass a sco
 - **Slack:** `DESIGN_SLACK_CHANNELS` (channel ids).
 - **Figma:** `FIGMA_PROJECT_IDS` (every file in those folders) and/or `FIGMA_FILE_KEYS`.
 
-Other settings: `DESIGN_APPROVAL_CHANNEL` (previews with buttons), `DESIGN_UPDATE_CHANNEL` (where approved updates post; unset means approvals are dry runs), `WEEKLY_DRAFT_AT` (e.g. `fri 10:00`) with `WEEKLY_DRAFT_TZ`, and `DRAFT_MODEL` / `CHAT_MODEL` (defaults `claude-opus-5-5` / `claude-sonnet-5-5`). See `config.example.env` for the full list.
+Other settings: `DESIGN_APPROVAL_CHANNEL` (previews with buttons), `DESIGN_UPDATE_CHANNEL` (where approved updates post; unset means approvals are dry runs), `WEEKLY_DRAFT_AT` (e.g. `fri 10:00`) with `WEEKLY_DRAFT_TZ`, and the models: `DRAFT_MODEL` (default `claude-opus-5-5`) writes drafts, `CHAT_MODEL` (`claude-sonnet-5-5`) discusses and revises them, and `REFERENCE_MODEL` (`claude-haiku-5-5`) answers brand and asset questions like "white logo as SVG". The routing is a small word check in `modelFor()` (`src/run-agent.ts`); each run's model is in `data/runs.jsonl`. See `config.example.env` for the full list.
 
 ## How it stays safe
 

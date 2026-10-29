@@ -14,6 +14,8 @@ export const AGENT_RUNNER = process.env.AGENT_RUNNER?.trim() === "modal" ? "moda
 
 export const DRAFT_MODEL = process.env.DRAFT_MODEL?.trim() || "claude-opus-5-5";
 export const CHAT_MODEL = process.env.CHAT_MODEL?.trim() || "claude-sonnet-5-5";
+// Short reference and asset answers ("white logo as SVG") don't need the chat model.
+export const REFERENCE_MODEL = process.env.REFERENCE_MODEL?.trim() || "claude-haiku-5-5";
 
 export const DATA_DIR = path.resolve(APP_ROOT, process.env.DATA_DIR?.trim() || "data");
 

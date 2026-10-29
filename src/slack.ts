@@ -128,7 +128,7 @@ async function handleMessage(
       ? `Conversation in this Slack thread so far:\n\n${transcript}\n\nRespond to this latest message: ${userMessage}`
       : userMessage;
 
-    const { text: response } = await runAgent(prompt, { mode: "chat", actor, draftId: draft?.id, onProgress });
+    const { text: response } = await runAgent(prompt, { mode: "chat", actor, draftId: draft?.id, question: userMessage, onProgress });
 
     await client.chat.update({
       channel,

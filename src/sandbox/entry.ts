@@ -30,7 +30,7 @@ async function main() {
   });
   ctx.runId = job.runId;
 
-  const text = await runInProcess(job.prompt, ctx, job.draft, (label) => emit({ type: "progress", label }));
+  const text = await runInProcess(job.prompt, ctx, job.draft, job.model, (label) => emit({ type: "progress", label }));
   emit({ type: "result", text, sources: [...ctx.sources.values()], toolCalls: ctx.toolCalls, drafts: drafts.saved() });
 }
 

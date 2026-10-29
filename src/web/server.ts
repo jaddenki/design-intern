@@ -118,7 +118,13 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, pa
     const before = draftId ? getDraft(draftId)?.updatedAt : undefined;
     const send = stream(res);
     try {
-      const { text } = await runAgent(prompt, { mode: "chat", actor, draftId, onProgress: (m) => send({ type: "progress", text: m }) });
+      const { text } = await runAgent(prompt, {
+        mode: "chat",
+        actor,
+        draftId,
+        question: message,
+        onProgress: (m) => send({ type: "progress", text: m }),
+      });
       const after = draftId ? getDraft(draftId)?.updatedAt : undefined;
       send({ type: "result", text: text || "I couldn't find an answer.", draftChanged: before !== after });
     } catch (err) {

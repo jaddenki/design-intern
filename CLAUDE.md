@@ -54,7 +54,7 @@ The agent runs as `user` (uid 2000) in the sandbox, not root: the `claude` binar
 | Want to change... | Edit... |
 |---|---|
 | Persona / drafting rules | `src/prompt.ts` |
-| Models | `DRAFT_MODEL` / `CHAT_MODEL` env, defaults in `src/config.ts` |
+| Models | `DRAFT_MODEL` / `CHAT_MODEL` / `REFERENCE_MODEL` env, defaults in `src/config.ts`; routing in `modelFor()` (`src/run-agent.ts`) |
 | Add a native source | `src/<service>/client.ts` + `tools/`, register in `src/agent.ts`, label in `run-agent.ts` |
 | Add a third-party MCP server | `mcp-servers.json` only |
 | Update sections | `src/drafts/types.ts` (`SECTIONS`) and `web/app.js` |

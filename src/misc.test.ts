@@ -49,6 +49,17 @@ test("web auth: Basic with the right password, name becomes the actor", () => {
   assert.equal(authenticate(undefined, "pw"), undefined);
 });
 
+test("models: Haiku for reference and asset questions, Sonnet for draft talk, Opus drafts", async () => {
+  const { modelFor } = await import("./run-agent.js");
+  const { CHAT_MODEL, DRAFT_MODEL, REFERENCE_MODEL } = await import("./config.js");
+  assert.equal(modelFor("draft"), DRAFT_MODEL);
+  assert.equal(modelFor("chat", { question: "give me the white logo as an svg" }), REFERENCE_MODEL);
+  assert.equal(modelFor("chat", { hasDraft: true, question: "what's our primary color?" }), REFERENCE_MODEL);
+  assert.equal(modelFor("chat", { hasDraft: true, question: "why is the logo refresh line a risk?" }), CHAT_MODEL);
+  assert.equal(modelFor("chat", { hasDraft: true, question: "drop the icon line" }), CHAT_MODEL);
+  assert.equal(modelFor("chat", { question: "can you update the draft?" }), CHAT_MODEL);
+});
+
 test("figma: project files merge with single file keys, project metadata wins", () => {
   const files = mergeFiles(["a", "b"], [{ key: "b", name: "Onboarding", lastModified: "2026-10-22T00:00:00Z", project: "Design" }, { key: "c", name: "Icons", lastModified: null, project: "Design" }]);
   assert.deepEqual(files.map((f) => f.key).sort(), ["a", "b", "c"]);

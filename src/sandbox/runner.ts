@@ -152,6 +152,7 @@ export async function runInSandbox(
   prompt: string,
   ctx: RunContext,
   draft: Draft | undefined,
+  model: string,
   onProgress?: (message: string) => void,
 ): Promise<string> {
   const cfg = modalConfig();
@@ -163,6 +164,7 @@ export async function runInSandbox(
     mode: ctx.mode,
     actor: ctx.actor,
     runId: ctx.runId,
+    model,
     draft,
     seed: [...ctx.sources.values()],
     env: { ...sandboxEnv(), DATA_DIR: "/tmp/design-intern-data", CLAUDE_CODE_EXECUTABLE: CLAUDE_BINARY },

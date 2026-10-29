@@ -8,6 +8,7 @@ export interface Job {
   mode: RunMode;
   actor: string;
   runId: string;
+  model: string;
   draft?: Draft;
   /** Sources citable from the start: the draft's, plus a check-in. */
   seed: SourceRef[];
