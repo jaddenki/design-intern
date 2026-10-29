@@ -156,6 +156,7 @@ export async function runInSandbox(
   onProgress?: (message: string) => void,
 ): Promise<string> {
   const cfg = modalConfig();
+  onProgress?.(`:brain: Using ${model}`);
   onProgress?.(":package: Checking the sandbox image…");
   const { client, app, image, proxySecret, vault } = await connect(cfg);
   onProgress?.(":lock: Starting a sandbox and an Agent Vault session…");
@@ -183,7 +184,7 @@ export async function runInSandbox(
         idleTimeoutMs: IDLE_TIMEOUT_MS,
         cpu: 1,
         memoryMiB: 2048,
-        tags: { app: "design-intern", mode: ctx.mode },
+        tags: { app: "design-intern", mode: ctx.mode, model },
         outboundCidrAllowlist: [],
       }),
     ]);

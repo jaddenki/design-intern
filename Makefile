@@ -1,4 +1,4 @@
-.PHONY: help web draft ask slack eval test check-init bootstrap-secrets sync-brand
+.PHONY: help web draft ask slack eval test check-init bootstrap-secrets sync-brand sandboxes runs
 
 # Host config and host credentials come from Infisical Secrets Manager (`infisical run`).
 # Every agent turn runs in a Modal Sandbox whose only way out is an Agent Proxy sidecar.
@@ -15,6 +15,8 @@ help:
 	@echo "make slack          run the Slack bot (also serves the inbox)"
 	@echo "make eval RUNS=3    score drafts on the fictional eval week (fixtures/expected.json)"
 	@echo "make test           unit tests (no Infisical or Modal needed)"
+	@echo "make sandboxes      running sandboxes, with the model each one uses"
+	@echo "make runs           the last 10 runs: model, time, tools, outcome (N=20 for more)"
 	@echo "make sync-brand     pull brand guidelines and logos into knowledge/brand/ (uses your gh login)"
 	@echo ""
 	@echo "make bootstrap-secrets   seed the Secrets Manager project with placeholders and defaults"
@@ -41,6 +43,12 @@ eval: check-init
 
 test:
 	npm test
+
+sandboxes: check-init
+	@infisical run --env=$(SECRETS_ENV) --path=$(SECRETS_PATH) --silent -- npx tsx scripts/sandboxes.ts
+
+runs:
+	@npx tsx scripts/runs.ts $(N)
 
 sync-brand:
 	npx tsx scripts/sync-brand.ts
