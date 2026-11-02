@@ -14,7 +14,8 @@ Each one imports `./bootstrap.js` first (the eval's fixture scope when `DATA_SOU
 
 ## Invariants (don't break these)
 
-1. **No agent write path to Slack.** The agent's only writes are `submit_draft` / `revise_draft`, which save a *pending* draft. Posting happens only in `drafts/actions.ts → approveDraft()`, called from a human click. Don't add a posting tool.
+1. **No agent write path to Slack.** The agent's Slack-side writes are `submit_draft` / `revise_draft`, which save a *pending* draft. Posting happens only in `drafts/actions.ts → approveDraft()`, called from a human click. Don't add a posting tool.
+6. **Writes only in write sessions.** Read sessions use `AGENT_VAULT_ACCESS_BUNDLE` and get no write tools. Contentful drafts go through `writeTools` in `mcp-servers.json`, enforced by the PreToolUse hook (`checkCall`), in a session over `AGENT_VAULT_WRITE_BUNDLE`. `bypassPermissions` ignores `allowedTools`, so the hook is the real tool allowlist. Never list a publish or delete tool.
 2. **Drafts cite only seen sources.** Source tools call `recordSource(ctx, …)`. `drafts/validate.ts` rejects any cited id not in `ctx.sources`. Every new source tool must record what it returns and print a `source_id:` line.
 3. **Scope lives in the client.** Each `client.ts` reads its allowlist from env and filters results again after fetching. Tools take no scope arguments.
 4. **Third-party text is fenced.** Wrap any human-written content in `untrusted(sourceId, body)`.
@@ -28,7 +29,8 @@ src/
 ├── knowledge/                       design reference docs from DESIGN_KNOWLEDGE_DIR (brand/ via scripts/sync-brand.ts, gitignored)
 ├── drafts/                          types, store (JSON files), validate, render, actions, tools/
 ├── external-mcp.ts                  mcp-servers.json loader + scope/source hooks
-├── figma/fixture-server.ts          eval stand-in with the same tool name as Framelink
+├── figma/                           api.ts (REST), projects.ts (scope), tools.ts (list, comments, render frames), fixture-server.ts
+├── access-tools.ts                  request_write_access: a read chat asks to rerun with the write bundle
 ├── web/server.ts + web/             approval inbox (vanilla HTML/CSS/JS, no build)
 ├── slack-approval.ts                approval preview blocks + the one posting function
 ├── run-agent.ts prompt.ts agent.ts  agent loop, system prompt, server factory
@@ -56,7 +58,8 @@ The agent runs as `user` (uid 2000) in the sandbox, not root: the `claude` binar
 | Persona / drafting rules | `src/prompt.ts` |
 | Models | `DRAFT_MODEL` / `CHAT_MODEL` / `REFERENCE_MODEL` env, defaults in `src/config.ts`; routing in `modelFor()` (`src/run-agent.ts`) |
 | Add a native source | `src/<service>/client.ts` + `tools/`, register in `src/agent.ts`, label in `run-agent.ts` |
-| Add a third-party MCP server | `mcp-servers.json` only |
+| Add a third-party MCP server | `mcp-servers.json` only (`writeTools` for anything that changes state) |
+| Skills | `scripts/package-skills.ts` (`make skills` / `make push-skills`), then add them to the bundles in Agent Vault |
 | Update sections | `src/drafts/types.ts` (`SECTIONS`) and `web/app.js` |
 | Posted message layout | `templates/weekly-update.md`; rendering in `src/drafts/render.ts` (`renderDraftMrkdwn`, `finalMessage`) |
 | Approval message | `src/slack-approval.ts` |

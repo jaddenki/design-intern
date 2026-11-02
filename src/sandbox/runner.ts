@@ -13,6 +13,8 @@ import { parseEventLine, sandboxEnv, type Job, type SandboxEvent } from "./job.j
 import { createVault } from "./vault.js";
 
 const PROXY_SIDECAR = "agent-proxy";
+const CLAUDE_DIR = `/home/${SANDBOX_USER}/.claude`;
+const SKILLS_DIR = `${CLAUDE_DIR}/skills`;
 const PROXY_PORT = 17323;
 const SESSION_MARGIN_MS = 5 * 60_000;
 const IDLE_TIMEOUT_MS = 5 * 60_000;
@@ -40,6 +42,8 @@ export interface ModalConfig {
   appName: string;
   environment?: string;
   bundle: string;
+  /** Second bundle with write credentials; unset means no run can write. */
+  writeBundle?: string;
   proxySecret: string;
   caFingerprint: string;
   infisicalDomain: string;
@@ -63,6 +67,7 @@ export function modalConfig(env: NodeJS.ProcessEnv = process.env): ModalConfig {
     appName: get("MODAL_APP_NAME") ?? "design-intern",
     environment: get("MODAL_ENVIRONMENT"),
     bundle: get("AGENT_VAULT_ACCESS_BUNDLE") ?? "design-intern",
+    writeBundle: get("AGENT_VAULT_WRITE_BUNDLE"),
     proxySecret: get("AGENT_VAULT_PROXY_SECRET") ?? "design-intern-proxy",
     caFingerprint: get("AGENT_VAULT_CA_FINGERPRINT")!,
     infisicalDomain: get("INFISICAL_DOMAIN") ?? "https://app.infisical.com",
@@ -85,8 +90,9 @@ export function bootstrapScript(caFingerprint: string): string {
     "export INFISICAL_AGENT_VAULT_SESSION_TOKEN",
     `export INFISICAL_AGENT_VAULT_PROXY_ADDRESS=${PROXY_SIDECAR}:${PROXY_PORT} NODE_USE_ENV_PROXY=1`,
     `cd ${APP_DIR}`,
+    // The CLI installs the bundle's skills here before the agent starts; the SDK loads them.
     "exec env HTTPS_PROXY=http://127.0.0.1:9 HTTP_PROXY=http://127.0.0.1:9 INFISICAL_DISABLE_UPDATE_CHECK=1 " +
-      `infisical agent-vault run --telemetry=false --ca-fingerprint=${quote(caFingerprint)} -- node dist/sandbox/entry.js`,
+      `infisical agent-vault run --telemetry=false --ca-fingerprint=${quote(caFingerprint)} --skills-dir ${SKILLS_DIR} -- node dist/sandbox/entry.js`,
   ].join("\n");
 }
 
@@ -162,24 +168,28 @@ export async function runInSandbox(
   onProgress?.(`:brain: Using ${model}`);
   onProgress?.(":package: Checking the sandbox image…");
   const { client, app, image, proxySecret, vault } = await connect(cfg);
-  onProgress?.(":lock: Starting a sandbox and an Agent Vault session…");
+  onProgress?.(ctx.access === "write" ? ":unlock: Starting a sandbox and a write session…" : ":lock: Starting a sandbox and an Agent Vault session…");
   const job: Job = {
     prompt,
     mode: ctx.mode,
     actor: ctx.actor,
     runId: ctx.runId,
     model,
+    access: ctx.access,
     draft,
     seed: [...ctx.sources.values()],
     env: {
       ...sandboxEnv(),
       DATA_DIR: "/tmp/design-intern-data",
       CLAUDE_CODE_EXECUTABLE: CLAUDE_BINARY,
+      CLAUDE_CONFIG_DIR: CLAUDE_DIR,
       // Telemetry and update checks would only hit hosts the proxy refuses.
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
       DISABLE_AUTOUPDATER: "1",
     },
   };
+  const bundle = ctx.access === "write" ? cfg.writeBundle : cfg.bundle;
+  if (!bundle) throw new Error("This run needs write access, but AGENT_VAULT_WRITE_BUNDLE isn't set.");
   const ttl = `${Math.ceil((cfg.timeoutMs + SESSION_MARGIN_MS) / 60_000)}m`;
   const bundleFile = appBundle();
   let session: { id: string; token: string } | undefined;
@@ -188,13 +198,13 @@ export async function runInSandbox(
   try {
     // Minted while the sandbox boots; both are cleaned up in finally.
     const [s, sb] = await Promise.allSettled([
-      vault.createSession(cfg.bundle, ttl, label ?? `${ctx.mode} · ${ctx.actor} · ${ctx.runId.slice(0, 8)}`),
+      vault.createSession(bundle, ttl, label ?? `${ctx.mode} · ${ctx.actor} · ${ctx.runId.slice(0, 8)}`),
       client.sandboxes.create(app, image, {
         timeoutMs: cfg.timeoutMs,
         idleTimeoutMs: IDLE_TIMEOUT_MS,
         cpu: 1,
         memoryMiB: 2048,
-        tags: { app: "design-intern", mode: ctx.mode, model },
+        tags: { app: "design-intern", mode: ctx.mode, access: ctx.access, model },
         outboundCidrAllowlist: [],
       }),
     ]);

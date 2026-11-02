@@ -1,4 +1,4 @@
-.PHONY: help web draft ask slack eval test check-init bootstrap-secrets sync-brand sandboxes runs
+.PHONY: help web draft ask slack eval test check-init bootstrap-secrets sync-brand skills push-skills sandboxes runs
 
 # Host config and host credentials come from Infisical Secrets Manager (`infisical run`).
 # Every agent turn runs in a Modal Sandbox whose only way out is an Agent Proxy sidecar.
@@ -19,6 +19,8 @@ help:
 	@echo "make sandboxes      running sandboxes, with the model each one uses"
 	@echo "make runs           the last 10 runs: model, time, tools, outcome (N=20 for more)"
 	@echo "make sync-brand     pull brand guidelines and logos into knowledge/brand/ (uses your gh login)"
+	@echo "make skills         package gtm-os playbooks as Agent Vault skills into skills/ (uses your gh login)"
+	@echo "make push-skills    package and publish them to Agent Vault (Infisical CLI 0.44.11+)"
 	@echo ""
 	@echo "make bootstrap-secrets   seed the Secrets Manager project with placeholders and defaults"
 	@echo "Secrets: env=$(SECRETS_ENV) path=$(SECRETS_PATH)"
@@ -37,7 +39,7 @@ ask: check-init
 	$(RUN) npm start -- "$(Q)"
 
 slack: check-init
-	$(RUN) npm run start:slack
+	$(RUN) WEB_ACCESS_PASSWORD=$(INBOX_PASSWORD) npm run start:slack
 
 eval: check-init
 	$(RUN) npm run eval -- --runs $(or $(RUNS),1)
@@ -54,6 +56,12 @@ runs:
 sync-brand:
 	npx tsx scripts/sync-brand.ts
 
+skills:
+	npx tsx scripts/package-skills.ts
+
+push-skills:
+	npx tsx scripts/package-skills.ts --push
+
 # Folders by sensitivity: host/ holds the only real credentials; agent/ holds placeholders
 # (real values live in the Agent Vault bundle); scope/ and config/ hold plain settings.
 bootstrap-secrets: check-init
@@ -64,6 +72,7 @@ bootstrap-secrets: check-init
 	  FIGMA_API_KEY=__figma_api_key__
 	infisical secrets set --env=$(SECRETS_ENV) --path=/config \
 	  AGENT_VAULT_ACCESS_BUNDLE=design-intern \
+	  AGENT_VAULT_WRITE_BUNDLE=design-intern-write \
 	  AGENT_VAULT_PROXY_SECRET=design-intern-proxy \
 	  DESIGN_ALLOWLIST=jadden@infisical.com
 	@echo ""
@@ -72,4 +81,4 @@ bootstrap-secrets: check-init
 	@echo "           INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET, SLACK_BOT_TOKEN, SLACK_APP_TOKEN"
 	@echo "  /config: AGENT_VAULT_CA_FINGERPRINT, DESIGN_APPROVAL_CHANNEL, DESIGN_UPDATE_CHANNEL"
 	@echo "  /scope:  LINEAR_ASSIGNEE_EMAILS and/or LINEAR_TEAM_KEYS, GITHUB_REPOS + DESIGN_GITHUB_LOGINS,"
-	@echo "           FIGMA_PROJECT_IDS, DESIGN_SLACK_CHANNELS"
+	@echo "           FIGMA_PROJECT_IDS, DESIGN_SLACK_CHANNELS, CONTENTFUL_SPACE_ID"

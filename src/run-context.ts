@@ -17,10 +17,26 @@ export interface SourceRef {
 
 export type RunMode = "draft" | "chat";
 
+/** Which Agent Vault bundle the run's session uses. Write tools exist only in "write". */
+export type Access = "read" | "write";
+
+/** A Figma frame rendered this run, which a draft may show as a preview. */
+export interface FrameRender {
+  fileKey: string;
+  nodeId: string;
+  name: string;
+  url: string;
+}
+
 export interface RunContext {
   runId: string;
   mode: RunMode;
+  access: Access;
   actor: string;
+  /** Frames render_figma_frames returned, keyed "fileKey:nodeId"; previews may use only these. */
+  renders: Map<string, FrameRender>;
+  /** Set when a read run asked for a write session; the host decides whether to start one. */
+  writeRequest?: { reason: string };
   now: Date;
   /** Every source a tool returned during this run; drafts may cite only these. */
   sources: Map<string, SourceRef>;
@@ -36,6 +52,7 @@ export interface RunContext {
 
 export function createRunContext(opts: {
   mode: RunMode;
+  access?: Access;
   actor: string;
   draftId?: string;
   seed?: SourceRef[];
@@ -46,7 +63,9 @@ export function createRunContext(opts: {
   return {
     runId: randomUUID(),
     mode: opts.mode,
+    access: opts.access ?? "read",
     actor: opts.actor,
+    renders: new Map(),
     now: USE_FIXTURES ? fixtureNow() : new Date(),
     sources,
     draftId: opts.draftId,

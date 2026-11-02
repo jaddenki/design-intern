@@ -4,13 +4,14 @@ import { allowlistConfigured, DESIGN_TEAM_ONLY_MESSAGE, isAllowedEmail } from ".
 import { AGENT_NAME } from "./config.js";
 import { approveDraft, editMessage, generateDraft, rejectDraft } from "./drafts/actions.js";
 import { finalMessage } from "./drafts/render.js";
-import { findDraftByPreview, getDraft } from "./drafts/store.js";
+import { findDraftByPreview, getDraft, saveDraft } from "./drafts/store.js";
 import { checkInFrom, DRAFT_REQUEST } from "./slack-draft-request.js";
 import { splitForSlack } from "./slack-chunks.js";
 import { brandImages, imageBlocks } from "./slack-images.js";
+import { MAX_PREVIEWS } from "./drafts/validate.js";
 import { runAgent } from "./run-agent.js";
 import { startWeeklyFromEnv } from "./schedule.js";
-import { APPROVE_ACTION, EDIT_ACTION, EDIT_MAX_CHARS, EDIT_VIEW, REJECT_ACTION } from "./slack-approval.js";
+import { APPROVE_ACTION, EDIT_ACTION, EDIT_MAX_CHARS, EDIT_VIEW, frameBlocks, REJECT_ACTION } from "./slack-approval.js";
 import { slackAgent } from "./slack-client.js";
 import { startWebServer } from "./web/server.js";
 
@@ -129,6 +130,8 @@ async function handleMessage(
     if (!draft && DRAFT_REQUEST.test(userMessage)) {
       // Anything said beyond the request is the check-in ("btw I also worked on…").
       const { draft: created, summary } = await generateDraft(actor, onProgress, checkInFrom(userMessage));
+      created.threads = [...(created.threads ?? []), { channel, ts: threadTs }];
+      saveDraft(created);
       const where = created.preview
         ? `Waiting for approval in <#${created.preview.channel}>. Nothing posts until someone approves it.`
         : "Nothing posts until someone approves it in the inbox.";
@@ -152,9 +155,16 @@ async function handleMessage(
       ? `Conversation in this Slack thread so far:\n\n${transcript}\n\nRespond to this latest message: ${userMessage}`
       : userMessage;
 
-    const { text: response } = await runAgent(prompt, { mode: "chat", actor, draftId: draft?.id, question: userMessage, onProgress });
+    const { text: response, ctx } = await runAgent(prompt, { mode: "chat", actor, draftId: draft?.id, question: userMessage, onProgress });
 
     await reply(response || "I couldn't find an answer. Try rephrasing your question.");
+    // A revised draft shows its frames in the review message; otherwise show them here.
+    const frames = ctx.savedDraftId ? [] : [...ctx.renders.values()].slice(-MAX_PREVIEWS);
+    if (frames.length > 0) {
+      await client.chat
+        .postMessage({ channel, thread_ts: threadTs, text: frames.map((f) => f.name).join(", "), blocks: frameBlocks({ previews: frames }) })
+        .catch((err) => console.error("Couldn't post Figma frames:", err));
+    }
   } catch (error) {
     console.error("Agent error:", error);
     try {

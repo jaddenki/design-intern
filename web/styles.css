@@ -389,6 +389,12 @@ a { color: inherit; }
 .message-preview { padding: 12px 14px; background: var(--card); box-shadow: var(--ring); font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
 .message-preview li.sub { margin-left: 18px; list-style: circle; }
 .message-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.frames { margin-top: 28px; }
+.frame-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 8px; }
+.frame { display: flex; flex-direction: column; background: var(--card); box-shadow: var(--ring), var(--shadow-1); color: inherit; text-decoration: none; transition: box-shadow var(--dur) var(--ease-out); }
+.frame img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: contain; background: var(--well); }
+.frame-name { padding: 8px 10px; font-size: 13px; color: var(--ink-2); border-top: 1px solid var(--hairline); }
+@media (hover: hover) { .frame:hover { box-shadow: var(--ring), var(--shadow-2); } }
 .history { margin-top: 28px; font-size: 13px; color: var(--ink-2); }
 .history summary { cursor: pointer; }
 .history ol { margin: 10px 0 0; padding-left: 18px; }

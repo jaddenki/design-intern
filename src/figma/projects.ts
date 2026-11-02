@@ -1,11 +1,9 @@
 // Figma "folders" are projects. FIGMA_PROJECT_IDS authorizes every file in those
-// projects; FIGMA_FILE_KEYS still authorizes single files. File contents are read
-// through the external MCP server; this module only decides which files are in scope.
+// projects; FIGMA_FILE_KEYS still authorizes single files.
 import { envList, USE_FIXTURES } from "../config.js";
 import { loadFixture } from "../fixtures.js";
+import { figmaGet } from "./api.js";
 
-const API_BASE = "https://api.figma.com/v1";
-const REQUEST_TIMEOUT_MS = 15_000;
 const CACHE_MS = 5 * 60_000;
 const PROJECT_ID = /^\d+$/;
 
@@ -16,28 +14,30 @@ export interface FigmaFile {
   project: string | null;
 }
 
-interface ProjectFilesResponse {
-  name: string;
-  files: { key: string; name: string; last_modified: string }[];
+interface FolderFilesResponse {
+  name?: string;
+  folder?: { name?: string };
+  files?: { key?: string; file_key?: string; name?: string; last_modified?: string; updated_at?: string }[];
 }
 
 export function projectIds(): string[] {
   return envList("FIGMA_PROJECT_IDS").filter((id) => PROJECT_ID.test(id));
 }
 
+// Figma renamed projects to folders (v2, folders:read); v1 still serves projects:read tokens.
 async function listProjectFiles(projectId: string): Promise<FigmaFile[]> {
-  const token = process.env.FIGMA_API_KEY;
-  if (!token) throw new Error("Missing FIGMA_API_KEY");
-  const res = await fetch(`${API_BASE}/projects/${projectId}/files`, {
-    headers: { "X-Figma-Token": token },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  const data = await figmaGet<FolderFilesResponse>(`/folders/${projectId}/files`, "v2")
+    .catch(() => figmaGet<FolderFilesResponse>(`/projects/${projectId}/files`))
+    .catch((err: Error) => {
+      throw new Error(`Couldn't list Figma folder ${projectId}: ${err.message}`);
+    });
+  const folder = data.name ?? data.folder?.name ?? `Folder ${projectId}`;
+  const files = (data.files ?? []).flatMap((f) => {
+    const key = f.key ?? f.file_key;
+    return key ? [{ key, name: f.name ?? key, lastModified: f.last_modified ?? f.updated_at ?? null, project: folder }] : [];
   });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Figma API error for project ${projectId}: ${res.status} ${res.statusText}. ${body.slice(0, 300)}`.trim());
-  }
-  const data = (await res.json()) as ProjectFilesResponse;
-  return data.files.map((f) => ({ key: f.key, name: f.name, lastModified: f.last_modified, project: data.name }));
+  if (files.length === 0 && !Array.isArray(data.files)) throw new Error(`Unexpected Figma folder response: ${JSON.stringify(data).slice(0, 300)}`);
+  return files;
 }
 
 /** Pure: merge single-file keys with project listings, project metadata winning. */

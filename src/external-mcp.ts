@@ -4,23 +4,44 @@
 // didn't write still can't leave its scope or feed uncitable content into a draft.
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import type { HookCallbackMatcher, HookEvent, McpStdioServerConfig } from "@anthropic-ai/claude-agent-sdk";
+import type { HookCallbackMatcher, HookEvent, McpHttpServerConfig, McpStdioServerConfig } from "@anthropic-ai/claude-agent-sdk";
 import { APP_ROOT, envList } from "./config.js";
 import { authorizedFileKeys } from "./figma/projects.js";
-import { recordSource, type RunContext, type SourceKind } from "./run-context.js";
+import { recordSource, type Access, type RunContext, type RunMode, type SourceKind } from "./run-context.js";
+
+interface Scope {
+  argument: string;
+  allowEnv: string;
+  expand?: keyof typeof SCOPE_RESOLVERS;
+}
 
 export interface ExternalServerSpec {
   description: string;
-  command: string;
+  /** "stdio" (default) runs `command`; "http" connects to `url` through the proxy. */
+  type?: "stdio" | "http";
+  command?: string;
   args?: string[];
   env?: Record<string, string>;
+  url?: string;
+  headers?: Record<string, string>;
   requiredEnv?: string[];
+  /** Tools callable in any run. Everything else the server exposes is denied. */
   allowedTools: string[];
+  /** Tools callable only in a write run (write Agent Vault bundle). */
+  writeTools?: string[];
+  /** "write": mount the server only in write runs. */
+  access?: Access;
+  /** Run modes that mount the server; default all. */
+  modes?: RunMode[];
   /**
    * Calls must pass `argument` with a value listed in env `allowEnv`, or returned by the
    * named `expand` resolver. Empty list = deny all.
    */
-  scope?: { argument: string; allowEnv: string; expand?: keyof typeof SCOPE_RESOLVERS };
+  scope?: Scope;
+  /** Replaces `scope` for writeTools, so writes can be narrower than reads. */
+  writeScope?: Scope;
+  /** Listed tools that take no scoped argument (e.g. reading the server's own docs). */
+  unscopedTools?: string[];
   /** Register successful calls as citable sources. `{id}` in url is replaced. */
   source?: { kind: SourceKind; idArgument: string; url?: string };
 }
@@ -43,52 +64,90 @@ export function loadSpecs(file = CONFIG_PATH): Record<string, ExternalServerSpec
   }
 }
 
-const expand = (value: string) => value.replace(/\$\{([A-Z0-9_]+)\}/g, (_, key: string) => process.env[key] ?? "");
+/** `${VAR}` or `${VAR:-fallback}` from the environment. */
+const expand = (value: string) =>
+  value.replace(/\$\{([A-Z0-9_]+)(?::-([^}]*))?\}/g, (_, key: string, fallback?: string) => process.env[key]?.trim() || fallback || "");
 
-/** Specs whose required env is present, as SDK stdio configs. */
-export function activeServers(specs = loadSpecs()): Record<string, McpStdioServerConfig> {
-  const out: Record<string, McpStdioServerConfig> = {};
+export interface RunScope {
+  access: Access;
+  mode: RunMode;
+}
+
+const ALL: RunScope = { access: "write", mode: "chat" };
+
+function mountedIn(spec: ExternalServerSpec, run: RunScope): boolean {
+  if (spec.access === "write" && run.access !== "write") return false;
+  return !spec.modes || spec.modes.includes(run.mode);
+}
+
+/** Specs whose required env is present and that this run mounts, as SDK configs. */
+export function activeServers(specs = loadSpecs(), run: RunScope = ALL): Record<string, McpStdioServerConfig | McpHttpServerConfig> {
+  const out: Record<string, McpStdioServerConfig | McpHttpServerConfig> = {};
   for (const [name, spec] of Object.entries(specs)) {
-    const missing = (spec.requiredEnv ?? []).filter((k) => !process.env[k]);
-    if (missing.length > 0) continue;
-    out[name] = {
-      type: "stdio",
-      command: spec.command,
-      args: spec.args,
-      env: Object.fromEntries(Object.entries(spec.env ?? {}).map(([k, v]) => [k, expand(v)])),
-    };
+    const missing = (spec.requiredEnv ?? []).filter((k) => !process.env[k]?.trim());
+    if (missing.length > 0 || !mountedIn(spec, run)) continue;
+    const env = Object.fromEntries(Object.entries(spec.env ?? {}).map(([k, v]) => [k, expand(v)]));
+    if (spec.type === "http") {
+      if (!spec.url) continue;
+      out[name] = { type: "http", url: expand(spec.url), headers: Object.fromEntries(Object.entries(spec.headers ?? {}).map(([k, v]) => [k, expand(v)])) };
+    } else {
+      if (!spec.command) continue;
+      out[name] = { type: "stdio", command: spec.command, args: spec.args, env };
+    }
   }
   return out;
 }
 
-export function allowedToolNames(name: string, spec: ExternalServerSpec): string[] {
-  return spec.allowedTools.map((t) => `mcp__${name}__${t}`);
+/** Bare tool names this run may call on a server. */
+export function toolsFor(spec: ExternalServerSpec, access: Access): string[] {
+  return access === "write" ? [...spec.allowedTools, ...(spec.writeTools ?? [])] : spec.allowedTools;
+}
+
+export function allowedToolNames(name: string, spec: ExternalServerSpec, access: Access = "read"): string[] {
+  return toolsFor(spec, access).map((t) => `mcp__${name}__${t}`);
 }
 
 /** Pure: decide whether a call stays inside the server's declared scope. */
-export function checkScope(spec: ExternalServerSpec, input: unknown, expanded: string[] = []): { ok: true } | { ok: false; reason: string } {
-  if (!spec.scope) return { ok: true };
-  const allowed = [...envList(spec.scope.allowEnv), ...expanded];
-  const value = (input as Record<string, unknown> | undefined)?.[spec.scope.argument];
+export function checkScope(spec: ExternalServerSpec, input: unknown, expanded: string[] = [], scope = spec.scope): { ok: true } | { ok: false; reason: string } {
+  if (!scope) return { ok: true };
+  const allowed = [...envList(scope.allowEnv), ...expanded];
+  const value = (input as Record<string, unknown> | undefined)?.[scope.argument];
   if (allowed.length === 0) {
-    return { ok: false, reason: `No ${spec.scope.argument} values are authorized (${spec.scope.allowEnv} is empty and nothing else is authorized).` };
+    return { ok: false, reason: `No ${scope.argument} values are authorized (${scope.allowEnv} is empty and nothing else is authorized).` };
   }
   if (typeof value !== "string" || !allowed.includes(value)) {
-    return { ok: false, reason: `${spec.scope.argument} "${String(value)}" is not on the authorized list; only authorized files can be read.` };
+    return { ok: false, reason: `${scope.argument} "${String(value)}" is not on the authorized list for this tool.` };
   }
   return { ok: true };
 }
 
-function specForTool(specs: Record<string, ExternalServerSpec>, toolName: string): ExternalServerSpec | undefined {
-  const [, server] = toolName.match(/^mcp__([a-z0-9_]+)__/) ?? [];
-  return server ? specs[server] : undefined;
+/** Pure: the tool must be listed for this run's access, and its scope must hold. */
+export function checkCall(
+  spec: ExternalServerSpec,
+  tool: string,
+  access: Access,
+): { ok: false; reason: string } | { ok: true; scope?: Scope } {
+  const isWrite = spec.writeTools?.includes(tool) ?? false;
+  if (!spec.allowedTools.includes(tool) && !isWrite) return { ok: false, reason: `${tool} isn't an allowed tool.` };
+  if (isWrite && access !== "write") return { ok: false, reason: `${tool} changes things and needs a write session; call request_write_access first.` };
+  if (spec.unscopedTools?.includes(tool)) return { ok: true };
+  return { ok: true, scope: isWrite ? (spec.writeScope ?? spec.scope) : spec.scope };
+}
+
+function parseToolName(specs: Record<string, ExternalServerSpec>, toolName: string): { spec: ExternalServerSpec; tool: string } | undefined {
+  const [, server, tool] = toolName.match(/^mcp__([a-z0-9_]+)__(.+)$/) ?? [];
+  return server && specs[server] ? { spec: specs[server], tool } : undefined;
 }
 
 function responseIsError(response: unknown): boolean {
   return Boolean((response as { isError?: boolean } | undefined)?.isError);
 }
 
-/** Hooks enforcing scope and source tracking for every declared server, plus the run log. */
+const deny = (reason: string) => ({
+  hookSpecificOutput: { hookEventName: "PreToolUse" as const, permissionDecision: "deny" as const, permissionDecisionReason: reason },
+});
+
+/** Hooks enforcing tool lists, scope, and source tracking for every declared server, plus the run log. */
 export function buildHooks(ctx: RunContext, specs = loadSpecs()): Partial<Record<HookEvent, HookCallbackMatcher[]>> {
   return {
     PreToolUse: [
@@ -97,18 +156,15 @@ export function buildHooks(ctx: RunContext, specs = loadSpecs()): Partial<Record
           async (input) => {
             if (input.hook_event_name !== "PreToolUse") return {};
             ctx.toolCalls.push({ name: input.tool_name, input: input.tool_input, at: new Date().toISOString() });
-            const spec = specForTool(specs, input.tool_name);
-            const expand = spec?.scope?.expand ? SCOPE_RESOLVERS[spec.scope.expand] : undefined;
-            const expanded = expand ? await expand().catch(() => []) : [];
-            const verdict = spec ? checkScope(spec, input.tool_input, expanded) : { ok: true as const };
-            if (verdict.ok) return {};
-            return {
-              hookSpecificOutput: {
-                hookEventName: "PreToolUse",
-                permissionDecision: "deny",
-                permissionDecisionReason: verdict.reason,
-              },
-            };
+            const parsed = parseToolName(specs, input.tool_name);
+            if (!parsed) return {};
+            // bypassPermissions ignores allowedTools, so the tool list is enforced here.
+            const call = checkCall(parsed.spec, parsed.tool, ctx.access);
+            if (!call.ok) return deny(call.reason);
+            const resolver = call.scope?.expand ? SCOPE_RESOLVERS[call.scope.expand] : undefined;
+            const expanded = resolver ? await resolver().catch(() => []) : [];
+            const verdict = checkScope(parsed.spec, input.tool_input, expanded, call.scope);
+            return verdict.ok ? {} : deny(verdict.reason);
           },
         ],
       },
@@ -118,7 +174,7 @@ export function buildHooks(ctx: RunContext, specs = loadSpecs()): Partial<Record
         hooks: [
           async (input) => {
             if (input.hook_event_name !== "PostToolUse") return {};
-            const spec = specForTool(specs, input.tool_name);
+            const spec = parseToolName(specs, input.tool_name)?.spec;
             if (!spec?.source || responseIsError(input.tool_response)) return {};
             const id = (input.tool_input as Record<string, unknown>)?.[spec.source.idArgument];
             if (typeof id !== "string" || !id) return {};
@@ -136,13 +192,20 @@ export function buildHooks(ctx: RunContext, specs = loadSpecs()): Partial<Record
   };
 }
 
-export function describeServers(specs = loadSpecs(), active = activeServers(specs)): string[] {
+function describeScope(scope: Scope | undefined): string {
+  if (!scope) return "";
+  const listed = envList(scope.allowEnv).join(", ") || "none listed";
+  const more = scope.expand === "figma-projects" ? " plus every file in the authorized Figma projects (call list_figma_files to see them)" : "";
+  return `${scope.argument}: ${listed}${more}`;
+}
+
+export function describeServers(specs = loadSpecs(), run: RunScope = ALL, active = activeServers(specs, run)): string[] {
   return Object.keys(active).map((name) => {
     const spec = specs[name];
-    const listed = spec.scope ? envList(spec.scope.allowEnv).join(", ") || "none listed" : "";
-    const more = spec.scope?.expand === "figma-projects" ? " plus every file in the authorized Figma projects (call list_figma_files to see them)" : "";
-    const scope = spec.scope ? ` Authorized ${spec.scope.argument} values: ${listed}${more}.` : "";
+    const tools = allowedToolNames(name, spec, run.access).join(", ");
+    const scope = spec.scope ? ` Authorized ${describeScope(spec.scope)}.` : "";
+    const writes = run.access === "write" && spec.writeTools?.length && spec.writeScope ? ` Writes are limited to ${describeScope(spec.writeScope)}.` : "";
     const cite = spec.source ? ` Cite as ${spec.source.kind}:<${spec.source.idArgument}>.` : "";
-    return `- ${name} (${spec.allowedTools.map((t) => `mcp__${name}__${t}`).join(", ")}): ${spec.description}${scope}${cite}`;
+    return `- ${name} (${tools}): ${spec.description}${scope}${writes}${cite}`;
   });
 }

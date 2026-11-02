@@ -30,7 +30,7 @@ test("servers missing required env aren't mounted; env is expanded", () => {
   delete process.env.TEST_FIGMA_KEY;
   assert.deepEqual(activeServers({ figma: spec }), {});
   process.env.TEST_FIGMA_KEY = "__figma_api_key__";
-  assert.equal(activeServers({ figma: spec }).figma?.env?.KEY, "__figma_api_key__");
+  assert.equal((activeServers({ figma: spec }).figma as { env?: Record<string, string> } | undefined)?.env?.KEY, "__figma_api_key__");
 });
 
 test("hooks deny out-of-scope calls and record in-scope sources", async () => {

@@ -1,7 +1,7 @@
 // The contract between the host and the sandbox: one job in on stdin, NDJSON
 // events out on stdout. Nothing secret crosses it in either direction.
 import type { Draft } from "../drafts/types.js";
-import type { RunMode, SourceRef } from "../run-context.js";
+import type { Access, RunMode, SourceRef, FrameRender } from "../run-context.js";
 
 export interface Job {
   prompt: string;
@@ -9,6 +9,7 @@ export interface Job {
   actor: string;
   runId: string;
   model: string;
+  access: Access;
   draft?: Draft;
   /** Sources citable from the start: the draft's, plus a check-in. */
   seed: SourceRef[];
@@ -23,6 +24,8 @@ export type SandboxEvent =
       sources: SourceRef[];
       toolCalls: { name: string; input: unknown; at: string }[];
       drafts: Draft[];
+      writeRequest?: { reason: string };
+      renders?: FrameRender[];
     }
   | { type: "error"; message: string };
 
@@ -39,6 +42,9 @@ const FORWARDED = [
   "DESIGN_SLACK_CHANNELS",
   "FIGMA_PROJECT_IDS",
   "FIGMA_FILE_KEYS",
+  "CONTENTFUL_SPACE_ID",
+  "CONTENTFUL_ENVIRONMENT_ID",
+  "CONTENTFUL_MCP_URL",
 ];
 
 /**
@@ -57,6 +63,7 @@ export function sandboxEnv(host: NodeJS.ProcessEnv = process.env): Record<string
   const env: Record<string, string> = { ANTHROPIC_API_KEY: PLACEHOLDERS.ANTHROPIC_API_KEY };
   for (const key of FORWARDED) if (host[key]?.trim()) env[key] = host[key]!.trim();
   for (const [key, placeholder] of Object.entries(PLACEHOLDERS)) if (host[key]?.trim()) env[key] = placeholder;
+  if (host.AGENT_VAULT_WRITE_BUNDLE?.trim()) env.WRITE_ACCESS_AVAILABLE = "1";
   return env;
 }
 

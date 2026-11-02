@@ -14,8 +14,8 @@ export const APP_DIR = "/opt/design-intern";
 export const CLAUDE_BINARY = `${APP_DIR}/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude`;
 
 const NODE_IMAGE = "node:24-bookworm-slim";
-// 0.44.8+ starts a proxy from a reusable proxy token, with no enrollment step.
-export const INFISICAL_CLI_VERSION = "0.44.8";
+// 0.44.11+ installs the access bundle's skills (`agent-vault run --skills-dir`).
+export const INFISICAL_CLI_VERSION = "0.44.11";
 const HOST_ONLY = new Set(["modal"]);
 
 /** `name@version` for each runtime dependency, pinned to package-lock.json. */

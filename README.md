@@ -11,6 +11,9 @@ In Slack (@mention or DM) or in the web inbox's chat pane:
 - "Draft this week's design update." → drafts, saves as pending, sends an approval preview. In the inbox it first asks what you worked on; that check-in becomes a source the draft can cite (`make draft NOTE='…'` from the CLI).
 - In the preview's thread: "Why is the login redesign a risk?" / "Drop the icon line." → explains or revises the pending draft
 - "What's our primary color?" / "Give me the white logo as SVG" → answers from the brand docs in `knowledge/` (filled by `make sync-brand`), with a copyable, previewed SVG. Anything undocumented, it says so.
+- "Draft a Contentful entry for this case study" → starts a separate write session (see [Read and write sessions](#read-and-write-sessions)), makes the change, and links it. It writes Contentful drafts only, and it never publishes. Figma is read-only.
+
+Drafts show the Figma frames behind the week's work: the agent renders up to four frames, and they appear under the message in the Slack approval preview and the inbox. It also reads Figma comment threads as evidence.
 
 ## Architecture
 
@@ -57,9 +60,11 @@ make test           # unit tests, no Infisical or Modal needed
 
 ### One-time setup
 
-1. **Agent Vault bundle `design-intern`** with services for Anthropic, Linear (`Authorization`), GitHub, Figma (`X-Figma-Token`), and Slack (`Authorization`), each swapping its placeholder for the real credential. Set the proxy's traffic policy to bundle hosts only.
+1. **Agent Vault bundle `design-intern`** (read) with services for Anthropic, Linear (`Authorization`), GitHub, Figma (`X-Figma-Token`), Slack (`Authorization`), each swapping its placeholder for the real credential, and optionally Contentful's MCP server (`https://mcp.contentful.com/mcp`, OAuth). Set the proxy's traffic policy to bundle hosts only.
+   **Optional bundle `design-intern-write`** with Anthropic, Figma (REST, for screenshots and file listings), and Contentful's MCP server signed in as a Contentful user whose role can't publish. Grant the machine identity both bundles.
+   **Skills:** `make push-skills` (Infisical CLI 0.44.11+) packages the GTM team's playbooks from `Infisical/infisical-gtm-os` and publishes them. Add them to both bundles under Access Bundles > Skills. `agent-vault run` installs them in the sandbox before each turn.
 2. **Proxy:** create one in Agent Vault and put its proxy token in a Modal Secret named `design-intern-proxy` under `INFISICAL_AGENT_VAULT_PROXY_TOKEN`.
-3. **Machine identity** with Universal Auth that is a plain Agent Vault member granted only `design-intern`. An admin identity can mint sessions over any bundle.
+3. **Machine identity** with Universal Auth that is a plain Agent Vault member granted only `design-intern` (and `design-intern-write` if you use writes). An admin identity can mint sessions over any bundle.
 4. **Secrets Manager:** `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET`, `INFISICAL_UNIVERSAL_AUTH_CLIENT_ID`, `INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET`, `AGENT_VAULT_CA_FINGERPRINT` (the proxy's row on the Proxies page), the scope settings below, and, for the Slack bot, the real `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN`.
 
 The first run builds the sandbox image, which takes a few minutes; Modal caches it after that.
@@ -95,6 +100,7 @@ Each source fails closed when its scope is empty, and the model can't pass a sco
 - **GitHub:** `GITHUB_REPOS` plus `DESIGN_GITHUB_LOGINS` (PR authors).
 - **Slack:** `DESIGN_SLACK_CHANNELS` (channel ids).
 - **Figma:** `FIGMA_PROJECT_IDS` (every file in those folders) and/or `FIGMA_FILE_KEYS`.
+- **Contentful:** `CONTENTFUL_SPACE_ID` (every call must name it). Chat only, not weekly drafts. Install the Contentful MCP app in that space's environment; its tool settings are a second limit.
 
 Other settings: `DESIGN_APPROVAL_CHANNEL` (previews with buttons), `DESIGN_UPDATE_CHANNEL` (where approved updates post; unset means approvals are dry runs), `WEEKLY_DRAFT_AT` (e.g. `fri 10:00`) with `WEEKLY_DRAFT_TZ`, and the models: `DRAFT_MODEL` (default `claude-opus-5-5`) writes drafts, `CHAT_MODEL` (`claude-sonnet-5-5`) discusses and revises them, and `REFERENCE_MODEL` (`claude-haiku-5-5`) answers brand and asset questions like "white logo as SVG". The routing is a small word check in `modelFor()` (`src/run-agent.ts`); each run's model is in `data/runs.jsonl`. See `config.example.env` for the full list.
 
@@ -109,9 +115,15 @@ Other settings: `DESIGN_APPROVAL_CHANNEL` (previews with buttons), `DESIGN_UPDAT
 | Reading beyond scope | Each client enforces its own allowlist (see Scope). | `src/*/client.ts`, `src/external-mcp.ts` |
 | Prompt injection in Slack/Linear/PRs | Third-party text is fenced as `<untrusted_content>`; the system prompt treats it as evidence, never instructions. Worst case is a bad line in a pending draft, with its sources visible. | `src/tool-result.ts`, `src/prompt.ts` |
 | Unauthorized people | Slack users must be on `DESIGN_ALLOWLIST` (fails closed). The inbox needs `WEB_ACCESS_PASSWORD`. | `src/access.ts`, `src/web/server.ts` |
-| Generated code | `tools: []` disables every built-in tool, so only the MCP tools exist. | `src/run-agent.ts` |
+| Generated code | Every built-in tool is off except Skill, which is on only when the bundle installed skills, and only for those skills. Skills are text the model reads; with no shell or file tools they can't run anything. | `src/run-agent.ts` |
+| Writes | Read sessions hold no write credentials and get no write tools. A write runs in a second session over `design-intern-write`, labeled `Write: …` in Agent Vault and logged as its own run. Third-party tools not listed in `mcp-servers.json` are denied by a hook, so Contentful's publish and delete tools never run. | `src/access-tools.ts`, `src/external-mcp.ts` |
+| Spoofed previews | Previews can only be frames `render_figma_frames` returned this run, and the host re-checks that each URL is Figma's render bucket and its file is a seen source. | `src/drafts/validate.ts` |
 
 Every run is appended to `data/runs.jsonl` with its tool calls and source count, and every draft keeps a history of who created, edited, approved, or rejected it.
+
+## Read and write sessions
+
+A session covers exactly one Agent Vault bundle, so writing takes a second session. Every turn starts in a read session. In a chat, when someone asks for a change, the agent calls `request_write_access` with a one-line reason and stops. The host then reruns the same request in a fresh sandbox, in a session over `design-intern-write`. Only that session can call Contentful's `writeTools`. Weekly drafting never escalates. Leave `AGENT_VAULT_WRITE_BUNDLE` unset and nothing can write.
 
 ## Adding a source without touching the core
 
@@ -127,7 +139,7 @@ Figma is connected through Framelink's `figma-developer-mcp`, a third-party MCP 
 }
 ```
 
-The core mounts the server and allows only `allowedTools`. A `PreToolUse` hook denies any call whose `fileKey` isn't authorized: a single file in `FIGMA_FILE_KEYS`, or any file inside a Figma project (folder) in `FIGMA_PROJECT_IDS`, resolved at run time through the declared `expand` resolver. Nothing authorized means everything is denied. The Figma PAT needs `projects:read` for project listing. A small native `list_figma_files` tool shows the agent which authorized files changed this week. A `PostToolUse` hook registers each successful call as a citable source. To add another server, add an entry to `mcp-servers.json`; no code changes.
+The core mounts the server and allows only `allowedTools`. A `PreToolUse` hook denies any call whose `fileKey` isn't authorized: a single file in `FIGMA_FILE_KEYS`, or any file inside a Figma project (folder) in `FIGMA_PROJECT_IDS`, resolved at run time through the declared `expand` resolver. Nothing authorized means everything is denied. The Figma PAT needs `projects:read` for project listing. A small native `list_figma_files` tool shows the agent which authorized files changed this week. A `PostToolUse` hook registers each successful call as a citable source. To add another server, add an entry to `mcp-servers.json`; no code changes. Entries can also set `type: "http"` (a remote server reached through the proxy), `writeTools` and `writeScope` (callable only in write sessions, with their own allowlist), `access: "write"` (mounted only in write sessions), `modes` (e.g. chat only), and `unscopedTools`.
 
 ## Eval
 
@@ -136,7 +148,10 @@ The core mounts the server and allows only `allowedTools`. A `PreToolUse` hook d
 ## Known limitations
 
 - Modal sidecars are a beta feature (`experimentalSidecars`). DNS stays open inside the sandbox, a possible low-bandwidth exfiltration channel. Each sidecar holds the proxy token, which works until it's rotated in Infisical. These come from modal-agent's design.
-- Figma coverage is file structure only (name, pages, frames). Framelink doesn't expose comments or version history.
+- Figma coverage is file structure, comments, and rendered frames. Version history isn't read.
+- Figma render URLs expire (Figma says within 30 days). If Slack can't fetch one, the preview posts without frames.
+- Contentful's MCP server exposes dozens of tools, and every schema is loaded into chat turns even though only 13 are callable.
+- Write sessions start automatically once the agent asks, because the asker is already on the allowlist and asked in plain words. No extra click is required.
 - Drafts are JSON files, fine for one instance. Multiple replicas would need a database.
 - Inbox auth is a shared password plus a self-reported name, not SSO.
 - The weekly window is a rolling 7 days, not calendar weeks.

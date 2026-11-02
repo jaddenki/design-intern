@@ -23,6 +23,7 @@ async function main() {
   const drafts = memorySink(job.draft);
   const ctx = createRunContext({
     mode: job.mode,
+    access: job.access === "write" ? "write" : "read",
     actor: job.actor,
     draftId: job.draft?.id,
     seed: job.seed,
@@ -31,7 +32,7 @@ async function main() {
   ctx.runId = job.runId;
 
   const text = await runInProcess(job.prompt, ctx, job.draft, job.model, (label) => emit({ type: "progress", label }));
-  emit({ type: "result", text, sources: [...ctx.sources.values()], toolCalls: ctx.toolCalls, drafts: drafts.saved() });
+  emit({ type: "result", text, sources: [...ctx.sources.values()], toolCalls: ctx.toolCalls, drafts: drafts.saved(), writeRequest: ctx.writeRequest, renders: [...ctx.renders.values()] });
 }
 
 main().catch((err) => {

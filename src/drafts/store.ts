@@ -44,12 +44,15 @@ export function listDrafts(): Draft[] {
 }
 
 export function findDraftByPreview(channel: string, ts: string): Draft | undefined {
-  return listDrafts().find((d) => d.preview?.channel === channel && d.preview.ts === ts);
+  const at = (t?: { channel: string; ts: string }) => t?.channel === channel && t.ts === ts;
+  return listDrafts().find((d) => at(d.preview) || d.threads?.some(at));
 }
 
 export interface RunLogEntry {
   runId: string;
   mode: string;
+  /** Agent Vault bundle the run used: read, or write after an escalation. */
+  access?: string;
   actor: string;
   startedAt: string;
   finishedAt: string;

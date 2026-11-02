@@ -6,3 +6,5 @@ eval-results
 .DS_Store
 # Pulled by `make sync-brand` from Infisical's private brand repo; this repo is public.
 knowledge/brand/
+# Built by `make skills` from Infisical/infisical-gtm-os (internal); this repo is public.
+skills/

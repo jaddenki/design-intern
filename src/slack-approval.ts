@@ -4,8 +4,9 @@ import type { KnownBlock } from "@slack/web-api";
 import { USE_FIXTURES } from "./config.js";
 import { draftTitle, finalMessage } from "./drafts/render.js";
 import type { Draft } from "./drafts/types.js";
+import { fileUrl } from "./figma/api.js";
 import { containsSecret } from "./secret-guard.js";
-import { isSlackConfigured, slackClient } from "./slack-client.js";
+import { isSlackConfigured, slackClient, slackErrorCode } from "./slack-client.js";
 
 const SECTION_TEXT_LIMIT = 2_900;
 
@@ -30,10 +31,19 @@ function clip(s: string): string {
   return s.length > SECTION_TEXT_LIMIT ? `${s.slice(0, SECTION_TEXT_LIMIT)}…\n_(truncated, open the inbox for the full draft)_` : s;
 }
 
-export function previewBlocks(draft: Draft): KnownBlock[] {
+/** Rendered Figma frames, each with a link back to the frame. */
+export function frameBlocks(draft: Pick<Draft, "previews">): KnownBlock[] {
+  return (draft.previews ?? []).flatMap((p): KnownBlock[] => [
+    { type: "image", image_url: p.url, alt_text: p.name, title: { type: "plain_text", text: (p.caption ?? p.name).slice(0, 150) } },
+    { type: "context", elements: [{ type: "mrkdwn", text: `:art: <${fileUrl(p.fileKey, p.nodeId)}|${p.name.replace(/[<>|&]/g, "")}> in Figma` }] },
+  ]);
+}
+
+export function previewBlocks(draft: Draft, { images = true } = {}): KnownBlock[] {
   const blocks: KnownBlock[] = [
     { type: "header", text: { type: "plain_text", text: `Draft for review · ${draftTitle(draft).replace("Design update · ", "")}` } },
     { type: "section", text: { type: "mrkdwn", text: clip(finalMessage(draft)) } },
+    ...(images ? frameBlocks(draft) : []),
   ];
   if (draft.notes.length > 0) {
     blocks.push({
@@ -70,19 +80,52 @@ export function previewBlocks(draft: Draft): KnownBlock[] {
   return blocks;
 }
 
+/**
+ * Slack rejects the whole message when it can't fetch an image (Figma render URLs
+ * expire), so a failed send is retried without the frames rather than lost.
+ */
+async function withFrameFallback<T>(draft: Draft, send: (blocks: KnownBlock[]) => Promise<T>): Promise<T> {
+  if (!draft.previews?.length) return send(previewBlocks(draft));
+  try {
+    return await send(previewBlocks(draft));
+  } catch (err) {
+    if (slackErrorCode(err) !== "invalid_blocks") throw err;
+    console.warn(`Slack couldn't show draft ${draft.id}'s Figma frames; sending without them.`);
+    return send(previewBlocks(draft, { images: false }));
+  }
+}
+
 /** Post the pending draft to the approver channel. No-op when Slack isn't set up. */
 export async function sendForApproval(draft: Draft): Promise<Draft["preview"]> {
   const channel = approvalChannel();
   if (!liveSlack() || !channel) return undefined;
-  const res = await slackClient().chat.postMessage({ channel, text: `${draftTitle(draft)} is ready for review`, blocks: previewBlocks(draft) });
+  const res = await withFrameFallback(draft, (blocks) =>
+    slackClient().chat.postMessage({ channel, text: `${draftTitle(draft)} is ready for review`, blocks }),
+  );
   return res.ts ? { channel, ts: res.ts } : undefined;
 }
 
 export async function refreshPreview(draft: Draft): Promise<void> {
   if (!liveSlack() || !draft.preview) return;
-  await slackClient()
-    .chat.update({ channel: draft.preview.channel, ts: draft.preview.ts, text: draftTitle(draft), blocks: previewBlocks(draft) })
-    .catch((err) => console.error("Failed to refresh approval preview:", err));
+  const { channel, ts } = draft.preview;
+  await withFrameFallback(draft, (blocks) => slackClient().chat.update({ channel, ts, text: draftTitle(draft), blocks })).catch((err) =>
+    console.error("Failed to refresh approval preview:", err),
+  );
+}
+
+/** The approved message as sections (Slack caps each at 3,000 chars), then its frames. */
+export function approvedBlocks(draft: Draft, body: string, { images = true } = {}): KnownBlock[] {
+  const chunks: string[] = [];
+  let current = "";
+  for (const line of body.split("\n")) {
+    if (current && current.length + line.length + 1 > SECTION_TEXT_LIMIT) {
+      chunks.push(current);
+      current = "";
+    }
+    current = current ? `${current}\n${line}` : line.slice(0, SECTION_TEXT_LIMIT);
+  }
+  if (current) chunks.push(current);
+  return [...chunks.map((text): KnownBlock => ({ type: "section", text: { type: "mrkdwn", text } })), ...(images ? frameBlocks(draft) : [])];
 }
 
 /** Post an approved draft. Dry-runs during the eval or when no update channel is set. */
@@ -92,6 +135,18 @@ export async function postApprovedUpdate(draft: Draft): Promise<NonNullable<Draf
   if (containsSecret(body)) throw new Error(`Refusing to post draft ${draft.id}: it contains a credential-like string.`);
   const channel = updateChannel();
   if (!liveSlack() || !channel) return { channel: channel ?? "(not configured)", dryRun: true };
-  const res = await slackClient().chat.postMessage({ channel, text: body, unfurl_links: false, unfurl_media: false });
+  const send = (images: boolean) =>
+    slackClient().chat.postMessage({
+      channel,
+      text: body,
+      unfurl_links: false,
+      unfurl_media: false,
+      ...(draft.previews?.length && { blocks: approvedBlocks(draft, body, { images }) }),
+    });
+  const res = await send(true).catch((err) => {
+    if (!draft.previews?.length || slackErrorCode(err) !== "invalid_blocks") throw err;
+    console.warn(`Slack couldn't show draft ${draft.id}'s Figma frames; posting without them.`);
+    return send(false);
+  });
   return { channel, ts: res.ts, dryRun: false };
 }

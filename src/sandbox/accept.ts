@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { getDraft, newDraftId, saveDraft } from "../drafts/store.js";
 import type { Draft, DraftLine } from "../drafts/types.js";
-import { validateLines, validateNotes } from "../drafts/validate.js";
+import { checkPreviews, MAX_PREVIEWS, validateLines, validateNotes } from "../drafts/validate.js";
 import type { RunContext, SourceKind, SourceRef } from "../run-context.js";
 import type { SandboxEvent } from "./job.js";
 
@@ -42,6 +42,19 @@ export function acceptResult(result: Result, ctx: RunContext, seeded: Draft | un
     if (s) ctx.sources.set(s.id, s);
   }
   if (Array.isArray(result.toolCalls)) ctx.toolCalls.push(...result.toolCalls.slice(0, 200));
+  const renders = Array.isArray(result.renders) ? result.renders.slice(-MAX_PREVIEWS) : [];
+  for (const raw of renders) {
+    try {
+      const [frame] = checkPreviews([raw], ctx.sources) ?? [];
+      if (frame) ctx.renders.set(`${frame.fileKey}:${frame.nodeId}`, { fileKey: frame.fileKey, nodeId: frame.nodeId, name: frame.name, url: frame.url });
+    } catch {
+      // Not a Figma render of a seen file: never shown.
+    }
+  }
+  const reason = result.writeRequest?.reason;
+  if (ctx.access === "read" && ctx.mode === "chat" && isString(reason) && reason.trim()) {
+    ctx.writeRequest = { reason: reason.replace(/\s+/g, " ").trim().slice(0, 200) };
+  }
 
   const drafts = Array.isArray(result.drafts) ? result.drafts : [];
   if (drafts.length === 0) return;
@@ -53,6 +66,7 @@ export function acceptResult(result: Result, ctx: RunContext, seeded: Draft | un
   if (!lines || !notes) throw new Error("Sandbox returned a malformed draft.");
   const errors = [...validateLines(lines, ctx.sources), ...validateNotes(notes)];
   if (errors.length > 0) throw new Error(`Sandbox returned an invalid draft: ${errors.join(" ")}`);
+  const previews = checkPreviews(candidate.previews, ctx.sources);
 
   const now = new Date().toISOString();
   const sources = Object.fromEntries(ctx.sources);
@@ -64,6 +78,8 @@ export function acceptResult(result: Result, ctx: RunContext, seeded: Draft | un
     const last = candidate.history?.at(-1);
     stored.lines = lines;
     stored.notes = notes;
+    if (previews?.length) stored.previews = previews;
+    else delete stored.previews;
     stored.sources = { ...stored.sources, ...sources };
     stored.updatedAt = now;
     stored.history.push({ at: now, by: ctx.actor, action: "revised", detail: isString(last?.detail) ? last.detail.slice(0, 300) : undefined });
@@ -87,6 +103,7 @@ export function acceptResult(result: Result, ctx: RunContext, seeded: Draft | un
     notes,
     sources,
     history: [{ at: now, by: ctx.actor, action: "created" }],
+    ...(previews?.length && { previews }),
   };
   saveDraft(draft);
   ctx.savedDraftId = draft.id;

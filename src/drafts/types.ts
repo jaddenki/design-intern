@@ -23,6 +23,16 @@ export interface DraftLine {
   editedBy?: string;
 }
 
+/** A rendered Figma frame shown under the draft in Slack and the inbox. */
+export interface FramePreview {
+  fileKey: string;
+  nodeId: string;
+  name: string;
+  /** Figma's render URL (their image bucket), checked against FIGMA_IMAGE_URL. */
+  url: string;
+  caption?: string;
+}
+
 export type DraftStatus = "pending" | "approved" | "rejected";
 
 export interface DraftEvent {
@@ -45,8 +55,11 @@ export interface Draft {
   /** Every source the generating run saw, keyed by id; cited ones are a subset. */
   sources: Record<string, SourceRef>;
   history: DraftEvent[];
+  previews?: FramePreview[];
   /** A human's hand-edited Slack message; posts instead of the rendered template. */
   message?: { text: string; by: string; at: string };
   preview?: { channel: string; ts: string };
+  /** Slack threads where it was requested; replies there discuss it too. */
+  threads?: { channel: string; ts: string }[];
   posted?: { channel: string; ts?: string; dryRun: boolean };
 }

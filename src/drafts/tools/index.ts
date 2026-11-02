@@ -5,7 +5,7 @@ import { windowFor, type RunContext } from "../../run-context.js";
 import { text } from "../../tool-result.js";
 import { newDraftId } from "../store.js";
 import { SECTIONS, type Draft, type DraftLine } from "../types.js";
-import { validateLines, validateNotes, type ProposedLine } from "../validate.js";
+import { MAX_PREVIEWS, resolvePreviews, validateLines, validateNotes, type ProposedLine } from "../validate.js";
 
 const lineSchema = z.object({
   section: z.enum(SECTIONS).describe("Which part of the update this line belongs in."),
@@ -20,6 +20,18 @@ const lineSchema = z.object({
 const notesSchema = z
   .array(z.string())
   .describe("Short notes for the approver only: conflicts between sources, items left out and why, low-confidence calls.");
+
+const previewsSchema = z
+  .array(
+    z.object({
+      fileKey: z.string(),
+      nodeId: z.string(),
+      caption: z.string().optional().describe("A few words tying the frame to its line, e.g. 'New pricing table'."),
+    }),
+  )
+  .max(MAX_PREVIEWS)
+  .optional()
+  .describe(`Up to ${MAX_PREVIEWS} Figma frames from render_figma_frames to show approvers under the draft, most important first.`);
 
 const toLines = (lines: ProposedLine[]): DraftLine[] =>
   lines.map((l) => ({
@@ -37,10 +49,11 @@ export function draftTools(ctx: RunContext) {
   const submit = tool(
     "submit_draft",
     "Save this week's design update as a PENDING draft for human approval. This does not post anything; a human reviews, edits, and approves it in the inbox or Slack. Every line must cite source_ids returned by tools in this run. Call once when the draft is complete; if it's rejected, fix the listed problems and call again.",
-    { lines: z.array(lineSchema), notes: notesSchema },
+    { lines: z.array(lineSchema), notes: notesSchema, previews: previewsSchema },
     async (args) => {
       if (ctx.mode !== "draft") return text("submit_draft is only available when drafting the weekly update.");
-      const errors = [...validateLines(args.lines, ctx.sources), ...validateNotes(args.notes)];
+      const { previews, errors: previewErrors } = resolvePreviews(args.previews ?? [], ctx.renders);
+      const errors = [...validateLines(args.lines, ctx.sources), ...validateNotes(args.notes), ...previewErrors];
       if (errors.length > 0) return rejection(errors);
 
       const now = new Date().toISOString();
@@ -61,10 +74,13 @@ export function draftTools(ctx: RunContext) {
       draft.lines = toLines(args.lines);
       draft.notes = args.notes;
       draft.sources = Object.fromEntries(ctx.sources);
+      if (previews.length) draft.previews = previews;
+      else delete draft.previews;
       draft.updatedAt = now;
       ctx.drafts.save(draft);
       ctx.savedDraftId = draft.id;
-      return text(`Saved pending draft ${draft.id} with ${draft.lines.length} lines. It now waits for human approval.`);
+      const shown = previews.length ? ` and ${previews.length} Figma preview${previews.length > 1 ? "s" : ""}` : "";
+      return text(`Saved pending draft ${draft.id} with ${draft.lines.length} lines${shown}. It now waits for human approval.`);
     },
   );
 
@@ -75,18 +91,24 @@ export function draftTools(ctx: RunContext) {
       lines: z.array(lineSchema),
       notes: notesSchema,
       reason: z.string().describe("One line on what changed and why, e.g. 'Dropped icon audit per Maya'."),
+      previews: previewsSchema.describe("The complete new list of Figma previews. Omit to keep the current ones; [] removes them."),
     },
     async (args) => {
       if (!ctx.draftId) return text("There's no draft in this conversation to revise.");
       const draft = ctx.drafts.get(ctx.draftId);
       if (!draft) return text(`Draft ${ctx.draftId} no longer exists.`);
       if (draft.status !== "pending") return text(`Draft ${draft.id} is already ${draft.status}; it can't be revised.`);
-      const errors = [...validateLines(args.lines, ctx.sources), ...validateNotes(args.notes)];
+      const resolved = args.previews ? resolvePreviews(args.previews, ctx.renders, draft.previews) : undefined;
+      const errors = [...validateLines(args.lines, ctx.sources), ...validateNotes(args.notes), ...(resolved?.errors ?? [])];
       if (errors.length > 0) return rejection(errors);
 
       const now = new Date().toISOString();
       draft.lines = toLines(args.lines);
       draft.notes = args.notes;
+      if (resolved) {
+        if (resolved.previews.length) draft.previews = resolved.previews;
+        else delete draft.previews;
+      }
       draft.sources = { ...draft.sources, ...Object.fromEntries(ctx.sources) };
       draft.updatedAt = now;
       draft.history.push({ at: now, by: ctx.actor, action: "revised", detail: args.reason });

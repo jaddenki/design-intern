@@ -37,6 +37,8 @@ export function describeRun(run: {
   runId: string;
   question?: string;
   draftWindow?: { since: string; until: string };
+  /** A write-bundle session; the label leads with "Write:" so it stands out in the list. */
+  write?: boolean;
   secretLike?: (s: string) => boolean;
 }): string {
   const range = run.draftWindow ? `${fmtDay(run.draftWindow.since)} – ${fmtDay(run.draftWindow.until)}` : undefined;
@@ -49,7 +51,7 @@ export function describeRun(run: {
       : range
         ? clip(`Revise ${range} draft${said ? `: ${said}` : ""}`)
         : clip(said || "Chat question");
-  return sessionLabel(`${task} · ${askerName(run.actor)} · ${run.runId.slice(0, 8)}`);
+  return sessionLabel(`${run.write ? "Write: " : ""}${task} · ${askerName(run.actor)} · ${run.runId.slice(0, 8)}`);
 }
 
 export function createVault({ domain, clientId, clientSecret }: VaultConfig) {

@@ -275,12 +275,36 @@ function renderDraft() {
         ? h("aside", { class: "notes" }, h("div", { class: "label" }, "For you to check"), h("ul", {}, d.notes.map((n) => h("li", {}, n))))
         : null,
       renderMessage(d, editable),
+      renderFrames(d),
       ...sections,
       h(
         "details",
         { class: "history" },
         h("summary", { class: "label" }, `History · ${d.history.length}`),
         h("ol", {}, d.history.map((e) => h("li", {}, h("time", {}, fmtTime(e.at)), ` ${e.action} by ${e.by}${e.detail ? `: ${e.detail}` : ""}`))),
+      ),
+    ),
+  );
+}
+
+/* Rendered Figma frames the agent picked; the same ones show in the Slack preview. */
+function renderFrames(d) {
+  if (!d.previews?.length) return null;
+  const link = (p) => `https://www.figma.com/design/${encodeURIComponent(p.fileKey)}?node-id=${encodeURIComponent(p.nodeId.replaceAll(":", "-"))}`;
+  return h(
+    "section",
+    { class: "frames" },
+    h("h2", { class: "label" }, "From Figma"),
+    h(
+      "div",
+      { class: "frame-grid" },
+      d.previews.map((p) =>
+        h(
+          "a",
+          { class: "frame", href: link(p), target: "_blank", rel: "noopener" },
+          h("img", { src: p.url, alt: p.name, loading: "lazy" }),
+          h("span", { class: "frame-name" }, p.caption ?? p.name),
+        ),
       ),
     ),
   );

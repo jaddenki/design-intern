@@ -1,4 +1,5 @@
 import { createSdkMcpServer, type McpServerConfig } from "@anthropic-ai/claude-agent-sdk";
+import { accessTools, writesEnabled } from "./access-tools.js";
 import { USE_FIXTURES } from "./config.js";
 import { draftTools } from "./drafts/tools/index.js";
 import { activeServers, allowedToolNames, loadSpecs } from "./external-mcp.js";
@@ -30,6 +31,8 @@ export function buildServers(ctx: RunContext): { mcpServers: Record<string, McpS
     knowledge: server("knowledge", knowledgeTools(ctx)),
     drafts: server("drafts", draftTools(ctx)),
   };
+  // A chat in a read session can ask to be rerun with the write bundle.
+  if (ctx.mode === "chat" && ctx.access === "read" && writesEnabled()) mcpServers.access = server("access", accessTools(ctx));
   const allowedTools = Object.keys(mcpServers).map((name) => `mcp__${name}__*`);
 
   const specs = loadSpecs();
@@ -43,9 +46,9 @@ export function buildServers(ctx: RunContext): { mcpServers: Record<string, McpS
       allowedTools.push(...allowedToolNames("figma", specs.figma));
     }
   } else {
-    for (const [name, config] of Object.entries(activeServers(specs))) {
+    for (const [name, config] of Object.entries(activeServers(specs, ctx))) {
       mcpServers[name] = { ...config, alwaysLoad: true };
-      allowedTools.push(...allowedToolNames(name, specs[name]));
+      allowedTools.push(...allowedToolNames(name, specs[name], ctx.access));
     }
   }
   return { mcpServers, allowedTools };

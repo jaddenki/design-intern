@@ -192,7 +192,7 @@ export function startWebServer(port: number): http.Server {
       res.writeHead(200, {
         "content-type": asset.type,
         "cache-control": "no-store",
-        "content-security-policy": "default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:",
+        "content-security-policy": "default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://figma-alpha-api.s3.us-west-2.amazonaws.com https://*.figma.com",
         "x-content-type-options": "nosniff",
       });
       res.end(body);
